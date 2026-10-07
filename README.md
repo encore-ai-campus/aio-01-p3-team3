@@ -49,19 +49,22 @@
 ## 2. 시스템 아키텍처
 
 ```
-[Streamlit]  ──HTTP──▶  [FastAPI]
- 화면, 장애 주입 체크박스       │
-                         오케스트레이터 ───────▶ [LLM API]
-                         (에이전트 흐름)
-                              │
-                     ┌────────┴────────┐
-                     ▼                 ▼
-                [MCP 서버] ───────▶ [SQLite]
-              날씨·특보·쉼터 도구    캐시, 실행 로그, 프로필
-                     │
-                     ▼
-          기상청 단기예보 / 기상특보 / 쉼터 CSV
+ frontend 컨테이너          backend 컨테이너                     mcp 컨테이너
+┌──────────────┐        ┌───────────────────────┐          ┌──────────────────┐
+│  Streamlit   │──HTTP─▶│  FastAPI              │──MCP────▶│  MCP 서버          │
+│  화면,        │        │  오케스트레이터            │          │  날씨·특보·쉼터 도구   │
+│  장애 주입     │        │  + AutoHealing        │          └────────┬─────────┘
+└──────────────┘        │        │              │                   │
+                        │        ▼              │                   ▼
+                        │  [SQLite] (볼륨)        │    기상청 단기예보 / 기상특보 / 쉼터 CSV
+                        │  캐시, 실행 로그, 프로필    │
+                        └────────┬──────────────┘
+                                 ▼
+                             [LLM API]
 ```
+
+- 재시도·캐시 폴백은 backend의 AutoHealing에서 처리합니다. MCP 서버는 데이터를 가져오고, 실패하면 예외를 그대로 던집니다.
+- SQLite는 backend만 사용하며, 재배포해도 캐시가 남도록 Docker 볼륨에 저장합니다.
 
 | 구성요소 | 기술 | 역할 |
 |---|---|---|
@@ -70,7 +73,7 @@
 | 도구 계층 | MCP (FastMCP) | 날씨·특보·쉼터 조회 도구 |
 | DB | SQLite | 캐시(복구 수단), 실행 로그(복구 증거), 테스트 프로필 |
 | LLM | (팀에서 사용하는 모델) | 행동요령, 어르신용·보호자용 문장 생성 |
-| 배포 | Docker Compose + GitHub Actions | 컨테이너 2개(Streamlit, FastAPI), 테스트 실패 시 배포 차단 |
+| 배포 | Docker Compose + GitHub Actions | 컨테이너 3개(Streamlit, FastAPI, MCP 서버), 테스트 실패 시 배포 차단 |
 
 ---
 
@@ -502,20 +505,30 @@ cd <저장소 폴더>
 cp .env.example .env
 # .env에 KMA_API_KEY, LLM_API_KEY 입력
 
-# 3. 실행
-docker-compose up --build
+# 3. 실행 (루트 compose.yml로 컨테이너 3개를 한 번에 띄웁니다)
+docker compose up --build
 ```
 
 | 서비스 | 주소 |
 |---|---|
 | Streamlit | http://localhost:8501 |
 | FastAPI | http://localhost:8000 (`/docs`에서 API 확인) |
+| MCP 서버 | http://localhost:8010/mcp |
+
+**Compose 파일 구분**
+
+| 파일 | 용도 |
+|---|---|
+| `compose.yml` (루트) | 로컬 통합 실행용. 서비스 3개, 공용 네트워크, backend SQLite 볼륨 |
+| `frontend/deploy/compose.yml` 등 서비스별 파일 | 배포용. GitHub Actions가 서비스별로 빌드·배포 |
 
 **`.env.example`**
 ```
 KMA_API_KEY=
 LLM_API_KEY=
 API_URL=http://backend:8000
+MCP_URL=http://mcp:8010/mcp
+DB_PATH=/app/data/app.db
 ```
 
 > 장애 시험 전에는 정상 실행을 한 번 해서 캐시를 채워 두세요. 캐시가 비어 있으면 폴백이 동작하지 않습니다.
