@@ -1,0 +1,13 @@
+config/
+tests/
+.venv/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+deploy/compose.yml
+.git/
+.gitignore
+*.pem
+*.key
+*.p12
+*.pfx
