@@ -10,3 +10,5 @@ __pycache__/
 .pytest_cache/
 .venv/
 
+# SQLite DB 파일
+*.db
