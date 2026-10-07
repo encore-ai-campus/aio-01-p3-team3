@@ -26,6 +26,9 @@ load_dotenv(Path(__file__).resolve().parents[1] / "config" / ".env")
 MCP_URL = os.getenv("WEATHER_MCP_URL", "http://127.0.0.1:8010/mcp")
 app = FastAPI(title="Weather MCP Agent", version="1.0.0")
 
+
+
+
 class WeatherRequest(BaseModel):
     city: str = Field(min_length=1, max_length=60)
     day: Literal["today", "tomorrow"] = "tomorrow"
