@@ -1,8 +1,86 @@
 # 상옥 AutoHealing 수정 개발 계획 — 2026-10-08
 
+## 16:04 두나 요청 반영 — 다음 보완 계획
+
+출처: 1008_1604_상옥님 바이탈 DB 저장 및 장애 복구 요청_두나.md.
+첨부 파일명은 MMDD_HHMM_내용_작성자 형식으로 읽는다.
+1008은 10월 8일, 1604는 16:04, 두나는 작성자다. 명시한 날짜/시각/작성자를
+자료 구분에 쓰되, 최신 문서라는 이유만으로 제안 사항을 팀 확정 계약으로 취급하지 않는다.
+
+### 현재 구현과 요청의 차이
+
+- vital_readings, 측정·수신 시각 분리, 최신 조회, 중복 방지, SQLite 잠금 복구는 구현 완료.
+- 현재 save는 inserted/duplicate·reading_id·attempts 반환. 두나 제안은 DB 행 id(int) 반환.
+  id를 신규/중복 모두 반환하도록 repository를 보완하고 API용 저장 어댑터를 준비한다.
+- reading_id와 scenario는 현재 내부 repository 계약이다. 두나 제안 요청에는 없다.
+  public reading_id를 추가할지, 서버에서 중복 키를 만드는지 지혜/두나와 합의한다.
+  scenario=None으로 수집한 일반 스트림을 heat 시연 스트림으로 묵시 혼합하지 않는다.
+- 최신성 30초는 제안값이다. 설정형 정책/명시 인자로 준비하고 확정 전 하드코딩하지 않는다.
+- 시뮬레이터도 가상 데이터이므로 public source=mock, 캐시 대체=cache로 계획한다.
+  내부 origin=simulator는 유지하되 live로 임의 확장하지 않는다.
+  해든 코드 live/cache 입력 변환과 자동119의 데이터 신뢰 조건은 별도 확인한다.
+- 현재 DB 정렬은 measured_at_epoch 기준이다. ISO 문자열의 timezone별 정렬 문제를 피하므로 유지한다.
+  received_at은 서버 UTC ISO로 명시 저장하고 SQLite CURRENT_TIMESTAMP에 의존하지 않는다.
+
+### 개발 묶음 A: 저장·조회 연결 계약 보완
+
+1. 저장 반환에 행 id 추가: 신규 삽입과 동일 재전송은 같은 id를 반환.
+   다른 payload를 같은 reading_id로 보내면 ReadingConflict 유지.
+2. save_vital_reading(reading) / get_latest_vital_reading(profile_id, max_age_seconds)
+   어댑터를 준비하되 실제 public DTO 필드는 지혜 VitalReadingCreate 확정 후 매핑.
+3. latest의 None은 데이터 없음/만료라는 정상 조회 결과로 유지한다.
+   DB 잠금·파일·스키마 오류는 예외로 유지하여 None이나 가짜 정상값으로 바꾸지 않는다.
+4. async API는 동기 DB 호출을 별도 스레드에서 실행. 프로필 유효성/외래키/허용값은
+   지혜 수집 API 계약에 맞춘다. 기존 이력을 삭제하거나 임의로 외래키를 추가하지 않는다.
+
+### 개발 묶음 B: Vital 조회 복구 연결
+
+정상 최신 측정 조회 → source=mock으로 반환 → 마지막 정상 결과를 cache에도 저장.
+계약된 Vital 조회 경계의 일시 실패 → 제한된 재시도 → 유효한 cache 사용.
+캐시도 없을 때 Mock으로 대체할지 fail로 종료할지는 지혜 정책을 전달받는다.
+데이터 없음/만료는 DB 오류와 다르게 처리한다. 15초마다 데이터가 안 왔다는 이유만으로
+같은 DB를 반복 조회하는 루프를 복구 성공으로 간주하지 않는다.
+
+- 기존 cache_key(kind, profile_id, scenario) 규칙을 유지한다. vitals:profile-01로
+  일괄 변경하지 않는다. 일반 수집과 시나리오별 mock의 캐시 경계는 팀과 맞춘다.
+- DB 자체 장애면 같은 SQLite의 cache와 run_logs도 실패할 수 있다.
+  읽기/로그 실패를 원래 실패와 구분하고 복구가 되었다고 기록하지 않는다.
+  DB 장애 시에도 화면에 전달할 최소 오류 객체를 반환/전파할 경계를 준비하고,
+  Mock 대체 또는 최종 fail 결정은 지혜에게 맡긴다.
+- 저장/조회 sqlite3 busy/locked는 일시 장애로 제한된 재시도.
+  권한/디스크/스키마 오류는 무조건 반복하지 않는다.
+- vital fault는 DB 전체 장애가 아니라 조회 호출 장애로 주입하는 안을 우선 제안.
+  실제 DB 장애는 별도 시험 fixture로 검증하고 기존 fault enum을 임의 확장하지 않는다.
+- 로그의 상태는 success/retry/fallback/fail, recovery는 cache/mock.
+  오류는 원문 메시지 대신 민감정보 없는 오류 코드/종류를 기록한다.
+
+### 추가 시험 및 합의 목록
+
+시험: 같은 행 id 재반환, 최근 30초 후보의 경계값, 미수신/만료와 DB 오류 구분,
+최신 정상 조회 후 캐시 저장, 조회 fault 후 cache, cache 없음 정책별 결과,
+DB 전체 장애에서 cache/log도 불가, 프로필·시나리오·중복 재전송 분리.
+
+합의: VitalReadingCreate 입력/저장 반환 id, reading_id 생성 주체, scenario 유무,
+최신성 30초 확정, 캐시 유효시간(최신성 한계와 별도), 최신값/캐시/Mock 대체 우선순위,
+DB 장애 시 fail/Mock, 보관기간·정리·외래키.
+보관기간 확정 전 자동 삭제 작업을 추가하지 않는다.
+
+개발 묶음 A·B 구현 완료. 저장·중복 재전송의 같은 행 id 반환, VitalService 어댑터,
+get_vitals_with_healing을 추가했다. HTTP API와 팀원 함수 연결은 다음 단계다.
+
+### 보완 구현 검증 결과
+
+- 백엔드 테스트 80개 통과(기존 placeholder 1개 포함).
+- 최신값 없음/만료는 즉시 대체 경로로 이동하며 반복 조회하지 않는다.
+- 일시 조회 실패는 제한 재시도 후 캐시 복구, 실제 DB 장애는 같은 DB 캐시를 건너뛴다.
+- 캐시·Mock·최종 실패를 구분하고 Mock 콜백 및 DB 장애 시 Mock 허용을 명시 인자로 받는다.
+- 로그 저장 실패는 events의 persisted=False로 전달한다. 예외 원문은 기록하지 않는다.
+- 최신성은 freshness_seconds 필수 인자, 캐시 유효시간은 별도 RetryPolicy로 설정한다.
+- 다음 순서: 지혜 수집 DTO 매핑 → 두나 Vital 조회 함수 연결 → 기기 제어 → Vision/LLM → 통합 지표.
+
 ## 최신 진행 현황 — GitHub 공유용
 
-기준 main: 782dcaa (지혜 schemas.py 병합 포함). autohealing_jso에 반영 완료.
+개발 기준 main: 2a419c4 (지혜 스키마 및 첫 AutoHealing 묶음 병합 포함).
 계획서와 연결 안내는 이후에도 같은 docs 파일을 갱신해 브랜치/PR로 공유한다.
 아래 과거 확인 기록보다 이 현황과 실제 코드가 우선한다.
 
@@ -264,5 +342,5 @@ pending_approval은 완료 분모에서 제외, rejected는 기술 장애로 집
 
 ## 현재 수행하지 않은 작업
 
-서비스 실행·실제 MCP/LLM 호출·Docker 유지 시험·GitHub Actions 실행은 하지 않았다.
-계획 파일만 추가하며 소스 변경, 브랜치 병합, 커밋·푸시는 이 검토 범위에 포함하지 않는다.
+실제 MCP/LLM 호출·컨테이너 재생성 유지 시험은 통합 단계에 남아 있다.
+위 최신 진행 현황이 과거 검토 기록보다 우선한다.

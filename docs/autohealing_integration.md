@@ -82,7 +82,7 @@ saved = repo.save(
 latest = repo.latest(profile_id, scenario=scenario, max_age_s=freshness_seconds)
 ```
 
-- save는 inserted/duplicate와 attempts 반환. 같은 ID의 다른 payload는 ReadingConflict.
+- save는 id(int), inserted/duplicate와 attempts 반환. 같은 ID의 다른 payload는 ReadingConflict.
   reading_id는 전체 테이블에서 고유하므로 시뮬레이터는 UUID 등의 고유 ID를 사용하세요.
 - 데이터 필드는 heart_rate/systolic_bp/diastolic_bp/temperature_c/spo2/measured_at.
   타입·유한 숫자·시간대·미래시각만 검사합니다. 위험도/생리적 범위 검증은 수집 API/규칙 담당.
@@ -104,3 +104,34 @@ latest = repo.latest(profile_id, scenario=scenario, max_age_s=freshness_seconds)
 
 Docker DB_PATH/볼륨은 팀 main 설정을 사용합니다. 이번 검증은 SQLite 재열기까지이며
 컨테이너 재생성·배포 유지 시험은 통합 때 수행합니다.
+
+## 두나 저장·조회 어댑터 및 Vital 복구
+
+```python
+from src.db.vital_service import VitalService
+from src.healing.vital import get_vitals_with_healing, VitalDatabaseError, VitalUnavailable
+
+service = VitalService(db)
+row_id = service.save_vital_reading(reading)  # reading_id/profile_id 및 VitalData 필드
+result = await get_vitals_with_healing(
+    db=db, run_id=run_id, profile_id=profile_id, scenario=scenario,
+    fetch_latest=lambda: service.get_latest_vital_reading(
+        profile_id, scenario=scenario, max_age_seconds=freshness_seconds),
+    validate=validate_vital, freshness_seconds=freshness_seconds,
+    policy=RetryPolicy(max_attempts=3, max_cache_age_s=cache_age_seconds), fault=fault,
+)
+```
+
+수집 API에서는 동기 save를 asyncio.to_thread로 호출하세요. 공개 DTO에서 내부 reading_id를
+어떻게 만드는지는 수집 담당자와 합의해야 합니다. 동일 재전송은 같은 row_id를 반환합니다.
+
+None/만료는 반복 조회하지 않고 캐시로 이동합니다. 조회 실패는 제한 재시도하며 SQLite
+자체 장애는 같은 DB의 캐시를 읽지 않습니다. 캐시도 없으면 VitalUnavailable,
+DB 장애면 VitalDatabaseError를 전달합니다. 두 예외의 events로 저장 불가 로그를 확인하세요.
+Mock 대체는 mock_fetch를 제공해야 켜지며 DB 장애 대체는 mock_on_db_error=True도 필요합니다.
+대체 Mock은 측정 캐시에 덮어쓰지 않습니다. 일반 스트림 scenario=None은 시연 캐시와 분리합니다.
+
+반환은 data/source/attempts/recovery/events/log_persisted/database_failed입니다.
+source는 mock/cache, recovery는 None/retry/cache/mock이며 로그 저장 불가 시 persisted=False입니다.
+최신성 한계와 캐시 한계는 각각 명시해야 하며 30초는 확정 기본값으로 넣지 않았습니다.
+시험: `python -m pytest tests -q` — 80개 통과(기존 placeholder 1개 포함).
