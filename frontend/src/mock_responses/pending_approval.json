@@ -1,1 +1,63 @@
-{}
+{
+  "run_id": "run-demo-001",
+  "status": "pending_approval",
+  "current_step": "위험 판정 완료 → 보호자 승인 대기",
+  "care_status": {
+    "run_id": "run-demo-001",
+    "profile_id": "profile-01",
+    "scenario": "fall",
+    "vital": {
+      "heart_rate": 118,
+      "systolic_bp": 120,
+      "temperature_c": 36.4,
+      "spo2": 96,
+      "measured_at": "2026-10-08T15:30:00+09:00"
+    },
+    "cctv": {
+      "image_path": "assets/cctv/fall.jpg",
+      "summary": "거실 바닥에 사람이 쓰러져 있는 것으로 보입니다.",
+      "status": "analyzed"
+    },
+    "vulnerability": "상",
+    "source": "mock",
+    "errors": []
+  },
+  "emergency": {
+    "run_id": "run-demo-001",
+    "risk_level": "위급",
+    "reasons": [
+      "CCTV에서 쓰러짐이 의심되고 심박 변화가 확인됩니다."
+    ],
+    "axes": {
+      "fall": "위급",
+      "cardio": "주의",
+      "respiratory": "정상",
+      "environment": "정상"
+    },
+    "fall_state": "confirmed",
+    "auto_119": null,
+    "proposed_actions": [
+      {
+        "tool": "notify_guardian",
+        "description": "보호자에게 위급 상황을 알립니다.",
+        "arguments": {
+          "message": "승인이 필요합니다."
+        },
+        "needs_approval": false
+      },
+      {
+        "tool": "call_119",
+        "description": "보호자 승인 후 119 호출을 Mock으로 실행합니다.",
+        "arguments": {
+          "message": "CCTV에서 쓰러짐이 의심됩니다."
+        },
+        "needs_approval": true
+      }
+    ],
+    "requires_approval": true,
+    "cctv_summary": "거실 바닥에 사람이 쓰러져 있는 것으로 보입니다."
+  },
+  "message": "위급 상황으로 보호자 승인이 필요합니다.",
+  "approved": null,
+  "decided_by": null
+}
