@@ -4,6 +4,8 @@
 > 코드 안에서는 `grep -rn "팀 합의" backend/src mcp_server/src`로 같은 내용을 찾을 수 있습니다.
 > 모든 기준값은 **시연용 예시**이며 의학적 기준이 아닙니다.
 >
+> 10/8 변경: **main 스키마 연결**. `schemas.py`의 CareStatusResult(`vital.heart_rate`, `indoor_environment.temperature_c`, `devices.air_conditioner`, `induction` + `induction_minutes`, `cctv.status`)를 그대로 `evaluate()`/`run_emergency()`에 넘겨도 됩니다. `rules/risk.py`의 `normalize_care_status()`가 확정안 형식으로 바꿉니다. 확인: `backend/tests/test_schema_input.py`.
+>
 > 10/8 변경: **CCTV 판단 방식**. 비전 LLM은 "낙상인가"를 판단하지 않고 보이는 사실 4개(사람 보임, 몸이 닿은 곳 바닥/가구, 몸 모양 서기/앉기/눕기, 사진 선명)만 답합니다. 자세·낙상 의심은 `mcp_server/src/vision/analyzer.py`의 `FACT_RULES` 표가 정합니다. CCTV 낙상 의심이면 위급이고, 승인 알림에 캡처(`notify_guardian.value.cctv_image`)를 붙여 보호자가 사진을 보고 119를 승인합니다. CCTV 판단 불가면 원본 캡처 확인을 요청합니다.
 >
 > 10/8 변경: 확정안과 다르게 갔던 해든 확장 설계(워치 확인, 119 바로 연결)는 시연에서 꺼 두었습니다 (`ENABLE_WATCH_CHECK`, `ENABLE_AUTO_119` = False). 코드는 남아 있고 `tests/test_fall_cases.py`가 켜고 확인합니다.
@@ -91,6 +93,7 @@ CCTV 이미지      ─▶ mcp_server vision/analyzer.py  자세·낙상 의심 
 - `evaluate()` 결과에 `axes`, `fall_state`, `auto_119`가 새로 생김. `auto_119`가 있으면 **LLM 문장보다 먼저** 119 실행.
 - 승인 대기 타이머: 30초 다시 알림(`reminder_guardian_message`), 60초 뒤 `after_guardian_timeout(actions)` → `execute`는 실행, `remind`는 다시 알림.
 - `run_summary(..., decided_by="guardian" | "auto" | "timeout")`. 보호자 알림(notify_guardian)은 executed에 넣어도 안내문에서는 빠집니다. executed 형식 `[{"action": "control_device", "device": "aircon", "result": "success"}]`.
+- [팀 합의] `schemas.py`에 ① `DeviceStatus.induction_temperature: int | None` (확정안 과열 250℃ 판정용) ② `Scenario`에 `"critical"` ③ `ProposedAction.arguments`가 숫자도 받도록(`dict[str, str | int | float]`, 에어컨 `target: 26`) 부탁드려요.
 - CareStatusResult에 선택 키 `fall_event`(watch_fall, watch_response ok/help/none, immobile_seconds, head_impact_suspected), `signs`(abnormal_behavior, breathing_distress), cctv에 `confidence`.
 
 ### 두나 님 (데이터·MCP·승인 화면)

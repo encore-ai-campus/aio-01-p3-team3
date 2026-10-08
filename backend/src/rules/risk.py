@@ -43,6 +43,11 @@
 #   - 워치 확인(ENABLE_WATCH_CHECK)과 119 바로 연결(ENABLE_AUTO_119)은 끔. 확정안은 119를 모두 보호자 승인 뒤에 검.
 #   - 위험 범위 안쪽의 작은 바이탈 변화만 있으면 정상 (확정안 판정 순서 4). 변화는 "실내 이상 + 바이탈 변화 → 경고"에만 씀
 #     (VITAL_CHANGE_ALONE_RAISES = False). 예: 심박 95만 있으면 예전엔 주의, 지금은 정상.
+# 2026-10-08 해든 (main 스키마 연결): main의 schemas.py(CareStatusResult)와 키 이름이 달라 normalize_care_status()를 넣음.
+#   - vital.heart_rate/systolic_bp/temperature_c/spo2 → vitals.hr/sbp/temp/spo2, indoor_environment.temperature_c → env.temp
+#   - devices.air_conditioner → aircon, induction + induction_minutes(+ induction_temperature) → 구조 {"state","minutes","temperature"}
+#   - cctv.status(analyzed/unavailable/failed) → available, 숫자 confidence → "high"/"low", fall_event.voice_response → watch_response
+#   - 확정안 형식(vitals/env/구조 기기)으로 오면 그대로 둠. evaluate()와 Emergency Agent 입구에서 한 번 부름.
 #
 # 모든 수치는 시연용 예시 규칙이며 의학적 기준이 아님. 발표 전 출처(NEWS2, 질병관리청, WHO) 원문 확인.
 # 팀원과 겹치는 부분에는 "# [팀 합의] 이름: 설명" 주석을 달았음. 검색: grep -n "팀 합의" risk.py
@@ -580,8 +585,71 @@ def after_guardian_timeout(actions: list[dict]) -> dict:
 
 # [팀 합의] 지혜 님: README EmergencyResult보다 키가 늘어남 → axes(축별 단계), fall_state(낙상 상태), auto_119(바로 연결 이유).
 #   CareStatusResult 스키마(schemas.py)에 넣을지, 로그에만 남길지 정해 주세요.
+# ---------- main 스키마(CareStatusResult) → 규칙표 입력 ----------
+
+# [팀 합의] 지혜 님: main schemas.py 키(vital, indoor_environment, devices.induction_minutes)를 그대로 넘겨도 되고,
+#   확정안 형식(vitals, env, {"state","minutes","temperature"})으로 넘겨도 됨. 둘 다 여기서 같은 모양으로 바꿈.
+#   과열(250℃) 판정을 하려면 DeviceStatus에 induction_temperature: int | None 칸이 필요해요 (확정안 6·7번).
+#   Scenario에 "critical"도 추가 부탁드려요 (확정안 1번, 시나리오 5개).
+SCHEMA_VITAL_KEYS = {"heart_rate": "hr", "systolic_bp": "sbp", "temperature_c": "temp", "spo2": "spo2"}
+CCTV_SURE_FROM = 0.6        # 숫자 confidence가 이 값 이상이면 "high"
+
+
+def _plain(value):
+    """Pydantic 모델이면 dict로."""
+    return value.model_dump() if hasattr(value, "model_dump") else value
+
+
+def normalize_care_status(care_status) -> dict:
+    """main 스키마 형식이든 확정안 형식이든 규칙표가 읽는 형식(vitals, env, 구조 기기)으로 바꾼다. 여러 번 불러도 같음."""
+    cs = dict(_plain(care_status) or {})
+
+    if not cs.get("vitals") and cs.get("vital"):
+        vital = _plain(cs["vital"])
+        vitals = {short: vital.get(long) for long, short in SCHEMA_VITAL_KEYS.items()}
+        vitals["measured_at"] = vital.get("measured_at")
+        if cs.get("source") == "cache":
+            vitals["source"] = "cache"
+        cs["vitals"] = vitals
+
+    if not cs.get("env") and cs.get("indoor_environment"):
+        indoor = _plain(cs["indoor_environment"])
+        cs["env"] = {"temp": indoor.get("temperature_c"), "humidity": indoor.get("humidity_percent")}
+
+    devices = dict(_plain(cs.get("devices")) or {})
+    if "air_conditioner" in devices and "aircon" not in devices:
+        devices["aircon"] = {"state": devices.pop("air_conditioner")}
+    induction = devices.get("induction")
+    if isinstance(induction, str) and not induction.startswith("on("):
+        devices["induction"] = {"state": induction,
+                                "minutes": devices.pop("induction_minutes", None),
+                                "temperature": devices.pop("induction_temperature", None)}
+    if devices:
+        cs["devices"] = devices
+
+    cctv = _plain(cs.get("cctv"))
+    if isinstance(cctv, dict) and "status" in cctv and "available" not in cctv:
+        cctv = dict(cctv)
+        observed = cctv.get("posture") is not None or cctv.get("person_visible") is not None
+        cctv["available"] = cctv["status"] == "analyzed" or (cctv["status"] == "unavailable" and observed)
+        if isinstance(cctv.get("confidence"), (int, float)):
+            cctv["confidence"] = "high" if cctv["confidence"] >= CCTV_SURE_FROM else "low"
+        if not cctv.get("description"):
+            cctv["description"] = cctv.get("summary")
+        cs["cctv"] = cctv
+
+    event = _plain(cs.get("fall_event"))
+    if isinstance(event, dict) and event.get("watch_response") is None and event.get("voice_response") is not None:
+        cs["fall_event"] = dict(event, watch_response=event["voice_response"])
+
+    if cs.get("signs") is not None:
+        cs["signs"] = _plain(cs["signs"])
+    return cs
+
+
 def evaluate(care_status: dict, month: int) -> dict:
     """CareStatusResult → 위험도, 원인, 조치 목록. Emergency Agent가 이 결과에 병원·문장을 붙인다."""
+    care_status = normalize_care_status(care_status)
     causes = detect_causes(care_status)
     level = risk_level(causes, care_status.get("vulnerability"))
     indoor = indoor_state((care_status.get("env") or {}).get("temp"))
