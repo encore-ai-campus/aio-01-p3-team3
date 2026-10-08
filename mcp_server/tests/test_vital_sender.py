@@ -49,7 +49,7 @@ def test_settings_read_environment_values() -> None:
     [
         ("VITAL_SEND_INTERVAL_SECONDS", "0"),
         ("VITAL_HTTP_TIMEOUT_SECONDS", "not-a-number"),
-        ("VITAL_SCENARIO", "critical"),
+        ("VITAL_SCENARIO", "storm"),
     ],
 )
 def test_settings_reject_invalid_values(field: str, value: str) -> None:
@@ -67,20 +67,19 @@ def test_build_payload_uses_existing_vital_contract() -> None:
     assert payload == {
         "profile_id": "profile-01",
         "heart_rate": 118,
-        "systolic_bp": 100,
-        "diastolic_bp": 65,
-        "temperature_c": 36.3,
-        "spo2": 93,
+        "systolic_bp": 120,
+        "temperature_c": 36.4,
+        "spo2": 96,
         "measured_at": "2026-10-08T15:30:00+00:00",
     }
 
 
 def test_build_payload_does_not_modify_shared_mock_data() -> None:
-    original_measured_at = SCENARIOS["normal"]["vital"]["measured_at"]  # type: ignore[index]
+    original_vital = dict(SCENARIOS["normal"]["vital"])  # type: ignore[arg-type]
 
     build_vital_payload("profile-01", "normal", measured_at=FIXED_TIME)
 
-    assert SCENARIOS["normal"]["vital"]["measured_at"] == original_measured_at  # type: ignore[index]
+    assert SCENARIOS["normal"]["vital"] == original_vital
     assert "profile_id" not in SCENARIOS["normal"]["vital"]  # type: ignore[operator]
 
 
@@ -105,7 +104,7 @@ def test_post_vital_reading_sends_json() -> None:
     assert result["status"] == "stored"
 
 
-def test_send_cycle_sends_all_five_profiles() -> None:
+def test_send_cycle_sends_all_profiles() -> None:
     received_profiles: list[str] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -137,8 +136,8 @@ def test_send_cycle_continues_after_one_profile_fails() -> None:
 
     assert requested_profiles == list(MOCK_PROFILES)
     assert results["profile-03"].startswith("failed:")
-    assert results["profile-04"] == "sent"
-    assert results["profile-05"] == "sent"
+    assert results["profile-01"] == "sent"
+    assert results["profile-02"] == "sent"
 
 
 def test_post_vital_reading_rejects_non_object_response() -> None:

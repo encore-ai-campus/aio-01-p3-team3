@@ -17,7 +17,6 @@ POST /vitals/readings
   "profile_id": "profile-01",
   "heart_rate": 82,
   "systolic_bp": 128,
-  "diastolic_bp": 78,
   "temperature_c": 36.7,
   "spo2": 97,
   "measured_at": "2026-10-08T15:30:00+09:00"
@@ -31,11 +30,10 @@ POST /vitals/readings
 ```python
 class VitalReadingCreate(BaseModel):
     profile_id: str
-    heart_rate: int | None = None
-    systolic_bp: int | None = None
-    diastolic_bp: int | None = None
-    temperature_c: float | None = None
-    spo2: int | None = None
+    heart_rate: int
+    systolic_bp: int
+    temperature_c: float
+    spo2: int
     measured_at: str
 ```
 

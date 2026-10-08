@@ -28,7 +28,6 @@ CREATE TABLE IF NOT EXISTS vital_readings (
     profile_id TEXT NOT NULL,
     heart_rate INTEGER,
     systolic_bp INTEGER,
-    diastolic_bp INTEGER,
     temperature_c REAL,
     spo2 INTEGER,
     measured_at TEXT NOT NULL,

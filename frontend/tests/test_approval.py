@@ -8,12 +8,12 @@ from src.approval import get_approval_actions, store_pending_approval
 
 
 def test_store_pending_approval_keeps_agreed_fields() -> None:
-    state: dict[str, object] = {"approval_result": {"status": "completed"}}
+    state: dict[str, object] = {"approval_result": {"status": "done"}}
     response = {
         "run_id": "run-001",
         "status": "pending_approval",
         "care_status": {"profile_id": "profile-01"},
-        "emergency": {"risk_level": "critical"},
+        "emergency": {"risk_level": "위급"},
     }
 
     store_pending_approval(response, state)
@@ -21,12 +21,12 @@ def test_store_pending_approval_keeps_agreed_fields() -> None:
     assert state == {
         "run_id": "run-001",
         "care_status": {"profile_id": "profile-01"},
-        "emergency": {"risk_level": "critical"},
+        "emergency": {"risk_level": "위급"},
     }
 
 
 def test_store_pending_approval_preserves_result_for_same_run() -> None:
-    result = {"status": "completed"}
+    result = {"status": "done"}
     state: dict[str, object] = {
         "run_id": "run-001",
         "approval_result": result,
@@ -40,14 +40,15 @@ def test_store_pending_approval_preserves_result_for_same_run() -> None:
     assert state["approval_result"] is result
 
 
-def test_only_device_and_119_actions_require_approval() -> None:
+def test_only_actions_marked_as_needing_approval_are_selected() -> None:
     emergency = {
         "proposed_actions": [
-            {"tool": "notify_guardian", "description": "알림"},
-            {"tool": "find_hospital", "description": "병원"},
-            {"tool": "control_device", "description": "에어컨"},
-            {"tool": "call_119", "description": "119"},
-        ]
+            {"tool": "notify_guardian", "description": "알림", "needs_approval": False},
+            {"tool": "find_hospital", "description": "병원", "needs_approval": False},
+            {"tool": "control_device", "description": "에어컨", "needs_approval": True},
+            {"tool": "call_119", "description": "119", "needs_approval": True},
+        ],
+        "requires_approval": True,
     }
 
     actions = get_approval_actions(emergency)
@@ -70,18 +71,21 @@ render_approval_panel(
         "current_step": "보호자 승인 대기",
         "care_status": {"cctv": None},
         "emergency": {
-            "risk_level": "critical",
+            "risk_level": "위급",
+            "requires_approval": True,
             "reasons": ["쓰러짐이 의심됩니다."],
             "proposed_actions": [
                 {
                     "tool": "notify_guardian",
                     "description": "보호자에게 상황을 알립니다.",
                     "arguments": {},
+                    "needs_approval": False,
                 },
                 {
                     "tool": "call_119",
                     "description": "119 호출을 실행합니다.",
                     "arguments": {"message": "쓰러짐 의심"},
+                    "needs_approval": True,
                 },
             ],
         },
@@ -110,13 +114,15 @@ render_approval_panel(
         "status": "pending_approval",
         "care_status": None,
         "emergency": {
-            "risk_level": "caution",
+            "risk_level": "주의",
+            "requires_approval": False,
             "reasons": ["확인이 필요합니다."],
             "proposed_actions": [
                 {
                     "tool": "notify_guardian",
                     "description": "보호자에게 알립니다.",
                     "arguments": {},
+                    "needs_approval": False,
                 }
             ],
         },
@@ -131,12 +137,52 @@ render_approval_panel(
     assert any("추가 승인이 필요한 조치는 없습니다" in info.value for info in app.info)
 
 
+def test_critical_auto_119_renders_result_without_approval_buttons() -> None:
+    app = AppTest.from_string(
+        """
+from src.approval import render_approval_panel
+
+render_approval_panel(
+    {
+        "run_id": "run-005",
+        "status": "done",
+        "current_step": "119 자동 연결 완료",
+        "care_status": None,
+        "emergency": {
+            "risk_level": "위급",
+            "auto_119": "VITAL_SEVERE",
+            "requires_approval": False,
+            "reasons": ["바이탈 위험 범위 항목이 3개입니다."],
+            "proposed_actions": [
+                {
+                    "tool": "call_119",
+                    "description": "119 자동 연결",
+                    "arguments": {"message": "바이탈 매우 위험"},
+                    "needs_approval": False,
+                }
+            ],
+        },
+        "message": "보호자 승인 없이 119에 연락했습니다.",
+        "approved": None,
+        "decided_by": "auto",
+    },
+    "http://backend.test",
+)
+"""
+    ).run()
+
+    assert not app.exception
+    assert len(app.button) == 0
+    assert any("자동 긴급 조치" in success.value for success in app.success)
+    assert any("보호자 승인 없이" in error.value for error in app.error)
+
+
 def test_normal_and_failed_results_have_clear_feedback() -> None:
     normal_app = AppTest.from_string(
         """
 from src.approval import render_approval_panel
 render_approval_panel(
-    {"status": "normal", "message": "정상 상태입니다."},
+    {"status": "no_issue", "message": "정상 상태입니다."},
     "http://backend.test",
 )
 """
@@ -145,7 +191,7 @@ render_approval_panel(
         """
 from src.approval import render_approval_panel
 render_approval_panel(
-    {"status": "failed", "message": "실행에 실패했습니다."},
+    {"status": "fail", "message": "실행에 실패했습니다."},
     "http://backend.test",
 )
 """
@@ -160,7 +206,7 @@ render_approval_panel(
 @pytest.mark.parametrize(
     ("button_index", "decision", "response_status", "expected_message"),
     [
-        (0, "approve", "completed", "승인된 조치를 실행했습니다."),
+        (0, "approve", "done", "승인된 조치를 실행했습니다."),
         (1, "reject", "rejected", "보호자가 조치를 거절했습니다."),
     ],
 )
@@ -198,13 +244,15 @@ render_approval_panel(
         "status": "pending_approval",
         "care_status": None,
         "emergency": {
-            "risk_level": "warning",
+            "risk_level": "경고",
+            "requires_approval": True,
             "reasons": ["조치가 필요합니다."],
             "proposed_actions": [
                 {
                     "tool": "control_device",
                     "description": "에어컨을 작동합니다.",
-                    "arguments": {"device": "aircon", "mode": "cool", "target": 26},
+                    "arguments": {"device": "aircon", "action": "cool"},
+                    "needs_approval": True,
                 }
             ],
         },

@@ -10,6 +10,8 @@ import requests
 
 
 DEFAULT_TIMEOUT_SECONDS = 10.0
+SCENARIOS = frozenset({"normal", "heat", "induction", "fall", "critical"})
+FAULT_NAMES = frozenset({"vital", "iot", "vision", "llm"})
 
 
 class BackendAPIError(RuntimeError):
@@ -69,8 +71,12 @@ def request_care_run(
 
     if not profile_id.strip():
         raise ValueError("profile_id는 비어 있을 수 없습니다.")
-    if not scenario.strip():
-        raise ValueError("scenario는 비어 있을 수 없습니다.")
+    if scenario not in SCENARIOS:
+        raise ValueError(f"지원하지 않는 scenario입니다: {scenario}")
+    unknown_faults = set(fault) - FAULT_NAMES
+    if unknown_faults:
+        unknown = ", ".join(sorted(unknown_faults))
+        raise ValueError(f"지원하지 않는 fault입니다: {unknown}")
 
     requester = session or requests
     url = f"{_base_url(backend_url)}/care/run"

@@ -124,7 +124,7 @@ def send_vital_cycle(
     *,
     measured_at: datetime | None = None,
 ) -> dict[str, str]:
-    """다섯 프로필을 한 번씩 전송하고 프로필별 결과를 반환한다."""
+    """최신 계약의 세 프로필을 한 번씩 전송하고 결과를 반환한다."""
 
     results: dict[str, str] = {}
     cycle_time = measured_at or datetime.now().astimezone()
@@ -184,7 +184,7 @@ def run_sender(
 
 def _parse_args(settings: SenderSettings) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="가상 어르신 5명의 바이탈 데이터를 주기적으로 전송합니다.",
+        description="가상 어르신 3명의 바이탈 데이터를 주기적으로 전송합니다.",
     )
     parser.add_argument("--url", default=settings.ingest_url, help="바이탈 수집 API 주소")
     parser.add_argument(
@@ -208,7 +208,7 @@ def _parse_args(settings: SenderSettings) -> argparse.Namespace:
     parser.add_argument(
         "--once",
         action="store_true",
-        help="다섯 프로필을 한 번만 전송하고 종료",
+        help="세 프로필을 한 번만 전송하고 종료",
     )
     return parser.parse_args()
 

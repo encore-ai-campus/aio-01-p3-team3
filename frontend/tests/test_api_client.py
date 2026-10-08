@@ -91,7 +91,7 @@ def test_request_care_run_uses_agreed_contract() -> None:
 @pytest.mark.parametrize("decision", ["approve", "reject"])
 def test_submit_care_decision_uses_same_run_id(decision: str) -> None:
     session = FakeSession(
-        FakeResponse(200, {"run_id": "run-001", "status": "completed"})
+        FakeResponse(200, {"run_id": "run-001", "status": "done"})
     )
 
     result = submit_care_decision(
@@ -159,3 +159,33 @@ def test_non_object_json_is_rejected() -> None:
             [],
             session=session,  # type: ignore[arg-type]
         )
+
+
+def test_request_care_run_accepts_critical_scenario() -> None:
+    session = FakeSession(FakeResponse(200, {"run_id": "run-005", "status": "done"}))
+
+    result = request_care_run(
+        "http://backend.test",
+        "profile-01",
+        "critical",
+        [],
+        session=session,  # type: ignore[arg-type]
+    )
+
+    assert result["status"] == "done"
+    assert session.calls[0][2]["json"]["scenario"] == "critical"
+
+
+def test_request_care_run_rejects_unknown_fault() -> None:
+    session = FakeSession(FakeResponse(200, {}))
+
+    with pytest.raises(ValueError, match="지원하지 않는 fault"):
+        request_care_run(
+            "http://backend.test",
+            "profile-01",
+            "normal",
+            ["database"],
+            session=session,  # type: ignore[arg-type]
+        )
+
+    assert session.calls == []

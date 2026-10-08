@@ -36,7 +36,7 @@
 
 ```text
 Python 바이탈 전송기
-  가상 어르신 5명
+  가상 어르신 3명
   15초마다 전송
          │ HTTP POST /vitals/readings
          ▼
@@ -121,7 +121,6 @@ Vital Agent는 해당 프로필의 가장 최근 측정값이 30초 이내이면
   "profile_id": "profile-01",
   "heart_rate": 82,
   "systolic_bp": 128,
-  "diastolic_bp": 78,
   "temperature_c": 36.7,
   "spo2": 97,
   "measured_at": "2026-10-08T15:30:00+09:00"
@@ -152,7 +151,6 @@ Vital Agent는 해당 프로필의 가장 최근 측정값이 30초 이내이면
   "vital": {
     "heart_rate": 118,
     "systolic_bp": 120,
-    "diastolic_bp": 78,
     "temperature_c": 36.4,
     "spo2": 95,
     "measured_at": "2026-10-08T15:30:00+09:00"
@@ -181,7 +179,6 @@ CREATE TABLE IF NOT EXISTS vital_readings (
   profile_id TEXT NOT NULL,
   heart_rate INTEGER,
   systolic_bp INTEGER,
-  diastolic_bp INTEGER,
   temperature_c REAL,
   spo2 INTEGER,
   measured_at TEXT NOT NULL,
@@ -255,10 +252,10 @@ VITAL_MAX_AGE_SECONDS=30
 백엔드와 DB 구현이 실행 중인 상태에서 `mcp_server` 폴더에서 다음 명령을 사용한다.
 
 ```powershell
-# 가상 어르신 5명을 한 번씩 전송하고 종료
+# 가상 어르신 3명을 한 번씩 전송하고 종료
 python -m src.vital_sender --once
 
-# 가상 어르신 5명을 15초마다 계속 전송
+# 가상 어르신 3명을 15초마다 계속 전송
 python -m src.vital_sender
 
 # 낙상 시나리오 바이탈을 15초마다 전송
@@ -282,5 +279,5 @@ python -m src.vital_sender --scenario fall --interval 15
 ## 13. 구현 완료 후 README에 사용할 한 줄 요약
 
 ```markdown
-Python 바이탈 전송기가 가상 어르신 5명의 측정값을 15초마다 HTTP로 전송하고, FastAPI가 이를 SQLite에 저장합니다. Vital Agent는 최근 30초 이내 데이터를 우선 사용하며, 조회 실패 시 AutoHealing이 재시도 후 마지막 정상 캐시로 복구합니다.
+Python 바이탈 전송기가 가상 어르신 3명의 측정값을 15초마다 HTTP로 전송하고, FastAPI가 이를 SQLite에 저장합니다. Vital Agent는 최근 30초 이내 데이터를 우선 사용하며, 조회 실패 시 AutoHealing이 재시도 후 마지막 정상 캐시로 복구합니다.
 ```

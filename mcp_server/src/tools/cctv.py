@@ -55,7 +55,6 @@ def analyze_cctv(image_path: str) -> dict[str, object]:
         "posture",
         "fall_suspected",
         "description",
-        "confidence",
     }
     missing_fields = required_fields - result.keys()
     if missing_fields:
@@ -79,11 +78,20 @@ def analyze_cctv(image_path: str) -> dict[str, object]:
     if not isinstance(result["description"], str):
         raise TypeError("CCTV 분석 결과의 description은 문자열이어야 합니다.")
 
-    confidence = result["confidence"]
-    if isinstance(confidence, bool) or not isinstance(confidence, (int, float)):
-        raise TypeError("CCTV 분석 결과의 confidence는 숫자여야 합니다.")
+    confidence = result.get("confidence")
+    if confidence is not None:
+        if isinstance(confidence, bool) or not isinstance(confidence, (int, float)):
+            raise TypeError("CCTV 분석 결과의 confidence는 숫자여야 합니다.")
+        if not 0 <= float(confidence) <= 1:
+            raise ValueError("CCTV 분석 결과의 confidence는 0부터 1 사이여야 합니다.")
+
+    status = result.get("status", "analyzed")
+    if status not in {"analyzed", "unavailable", "failed"}:
+        raise ValueError(f"지원하지 않는 CCTV status입니다: {status}")
 
     normalized_result = dict(result)
     normalized_result["image_path"] = image_path
+    normalized_result["summary"] = result.get("summary") or result["description"]
+    normalized_result["status"] = status
 
     return normalized_result

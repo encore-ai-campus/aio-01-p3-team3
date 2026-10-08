@@ -15,7 +15,6 @@ from .api_client import (
 )
 
 
-APPROVAL_REQUIRED_TOOLS = frozenset({"control_device", "call_119"})
 TOOL_LABELS = {
     "control_device": "기기 제어",
     "notify_guardian": "보호자 알림",
@@ -23,10 +22,10 @@ TOOL_LABELS = {
     "find_hospital": "가까운 병원 조회",
 }
 RISK_LABELS = {
-    "normal": "정상",
-    "caution": "주의",
-    "warning": "경고",
-    "critical": "위급",
+    "정상": "정상",
+    "주의": "주의",
+    "경고": "경고",
+    "위급": "위급",
 }
 
 
@@ -57,6 +56,8 @@ def get_approval_actions(emergency: Mapping[str, object] | None) -> list[dict[st
 
     if not emergency:
         return []
+    if emergency.get("requires_approval") is False:
+        return []
     raw_actions = emergency.get("proposed_actions")
     if not isinstance(raw_actions, list):
         return []
@@ -64,20 +65,20 @@ def get_approval_actions(emergency: Mapping[str, object] | None) -> list[dict[st
     return [
         action
         for action in raw_actions
-        if isinstance(action, dict) and action.get("tool") in APPROVAL_REQUIRED_TOOLS
+        if isinstance(action, dict) and action.get("needs_approval") is True
     ]
 
 
 def _render_risk(emergency: Mapping[str, object]) -> None:
-    risk_level = str(emergency.get("risk_level", "normal"))
+    risk_level = str(emergency.get("risk_level", "정상"))
     label = RISK_LABELS.get(risk_level, risk_level)
     message = f"위험도: {label}"
 
-    if risk_level == "critical":
+    if risk_level == "위급":
         st.error(message)
-    elif risk_level == "warning":
+    elif risk_level == "경고":
         st.warning(message)
-    elif risk_level == "caution":
+    elif risk_level == "주의":
         st.warning(message)
     else:
         st.info(message)
@@ -101,9 +102,7 @@ def _render_actions(emergency: Mapping[str, object]) -> None:
             continue
         tool = str(action.get("tool", "unknown"))
         description = str(action.get("description") or "상세 설명이 없습니다.")
-        approval_text = (
-            "승인 필요" if tool in APPROVAL_REQUIRED_TOOLS else "승인 없이 안내"
-        )
+        approval_text = "승인 필요" if action.get("needs_approval") is True else "승인 불필요"
         with st.container(border=True):
             st.markdown(
                 f"**{index}. {TOOL_LABELS.get(tool, tool)}** · {approval_text}"
@@ -160,9 +159,12 @@ def _render_cctv(
 def render_approval_result(result: Mapping[str, object]) -> None:
     """승인 또는 거절 처리 결과를 보호자에게 표시한다."""
 
-    status = str(result.get("status", "failed"))
-    if status == "completed":
-        st.success("승인된 조치를 실행했습니다.")
+    status = str(result.get("status", "fail"))
+    if status == "done":
+        if result.get("decided_by") == "auto":
+            st.success("자동 긴급 조치를 실행했습니다.")
+        else:
+            st.success("승인된 조치를 실행했습니다.")
     elif status == "rejected":
         st.info("보호자가 조치를 거절했습니다. 실행 없이 기록했습니다.")
     else:
@@ -222,19 +224,38 @@ def render_approval_panel(
         st.info("아직 실행 결과가 없습니다.")
         return
 
-    status = str(run_response.get("status", "failed"))
+    status = str(run_response.get("status", "fail"))
     current_step = run_response.get("current_step")
     if current_step:
         st.caption(f"현재 단계: {current_step}")
 
-    if status == "normal":
+    if status == "no_issue":
         st.success(str(run_response.get("message") or "현재 확인된 이상 징후가 없습니다."))
         return
-    if status == "failed":
+    if status == "fail":
         st.error(str(run_response.get("message") or "돌봄 실행에 실패했습니다."))
         return
-    if status == "recovered":
-        st.warning(str(run_response.get("message") or "장애를 복구해 결과를 확인했습니다."))
+
+    if status in {"done", "rejected"}:
+        emergency = run_response.get("emergency")
+        emergency_mapping = emergency if isinstance(emergency, dict) else None
+        care_status = run_response.get("care_status")
+        care_mapping = care_status if isinstance(care_status, dict) else None
+
+        if emergency_mapping:
+            _render_risk(emergency_mapping)
+            _render_actions(emergency_mapping)
+        _render_cctv(care_mapping, emergency_mapping, backend_url)
+
+        if run_response.get("decided_by") == "auto":
+            st.error(
+                str(
+                    run_response.get("message")
+                    or "바이탈이 매우 위험해 보호자 승인 없이 119에 연락했습니다."
+                )
+            )
+        render_approval_result(run_response)
+        return
 
     if status != "pending_approval":
         return

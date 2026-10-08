@@ -11,6 +11,27 @@ from src.tools.vitals import get_vitals
 from src.vision import analyzer
 
 
+def test_mock_data_matches_latest_team_contract() -> None:
+    assert set(MOCK_PROFILES) == {"profile-01", "profile-02", "profile-03"}
+    assert set(SCENARIOS) == {"normal", "heat", "induction", "fall", "critical"}
+    assert SCENARIOS["fall"]["vital"] == {
+        "heart_rate": 118,
+        "systolic_bp": 120,
+        "temperature_c": 36.4,
+        "spo2": 96,
+    }
+    assert SCENARIOS["critical"]["vital"] == {
+        "heart_rate": 140,
+        "systolic_bp": 85,
+        "temperature_c": 36.0,
+        "spo2": 88,
+    }
+    assert all(
+        "diastolic_bp" not in scenario["vital"]  # type: ignore[operator]
+        for scenario in SCENARIOS.values()
+    )
+
+
 @pytest.mark.parametrize("profile_id", MOCK_PROFILES)
 def test_get_vitals_supports_every_mock_profile(profile_id: str) -> None:
     result = get_vitals(profile_id, "normal")
@@ -32,7 +53,7 @@ def test_get_vitals_rejects_unknown_profile() -> None:
 
 def test_get_vitals_rejects_unknown_scenario() -> None:
     with pytest.raises(ValueError, match="지원하지 않는 scenario"):
-        get_vitals("profile-01", "critical")  # type: ignore[arg-type]
+        get_vitals("profile-01", "storm")  # type: ignore[arg-type]
 
 
 def test_get_vitals_returns_copy() -> None:
@@ -63,7 +84,7 @@ def test_get_indoor_env_rejects_unknown_profile() -> None:
 
 def test_get_indoor_env_rejects_unknown_scenario() -> None:
     with pytest.raises(ValueError, match="지원하지 않는 scenario"):
-        get_indoor_env("profile-01", "critical")  # type: ignore[arg-type]
+        get_indoor_env("profile-01", "storm")  # type: ignore[arg-type]
 
 
 def test_get_indoor_env_returns_copy() -> None:
@@ -95,6 +116,7 @@ def test_get_device_status_reports_induction_duration() -> None:
         "air_conditioner": "off",
         "induction": "on",
         "induction_minutes": 120,
+        "induction_temperature": 300,
     }
 
 
@@ -105,7 +127,7 @@ def test_get_device_status_rejects_unknown_profile() -> None:
 
 def test_get_device_status_rejects_unknown_scenario() -> None:
     with pytest.raises(ValueError, match="지원하지 않는 scenario"):
-        get_device_status("profile-01", "critical")  # type: ignore[arg-type]
+        get_device_status("profile-01", "storm")  # type: ignore[arg-type]
 
 
 def test_get_device_status_returns_copy() -> None:
@@ -148,7 +170,7 @@ def test_capture_cctv_rejects_unknown_profile() -> None:
 
 def test_capture_cctv_rejects_unknown_scenario() -> None:
     with pytest.raises(ValueError, match="지원하지 않는 scenario"):
-        capture_cctv("profile-01", "critical")  # type: ignore[arg-type]
+        capture_cctv("profile-01", "storm")  # type: ignore[arg-type]
 
 
 def test_capture_cctv_returns_new_mapping() -> None:
@@ -199,12 +221,12 @@ def test_find_hospital_returns_copy() -> None:
 
 
 def test_control_device_runs_aircon_mock() -> None:
-    result = control_device("aircon", mode="cool", target=26)
+    result = control_device("aircon", action="cool")
 
     assert result == {
         "tool": "control_device",
         "status": "success",
-        "message": "에어컨 냉방 26℃ 설정을 Mock으로 실행했습니다.",
+        "message": "에어컨 냉방을 Mock으로 실행했습니다.",
         "recovery": None,
     }
 
@@ -225,14 +247,9 @@ def test_control_device_rejects_unknown_device() -> None:
         control_device("heater", action="off")  # type: ignore[arg-type]
 
 
-def test_control_device_requires_aircon_mode() -> None:
-    with pytest.raises(ValueError, match="mode는 cool 또는 heat"):
-        control_device("aircon", target=26)
-
-
-def test_control_device_requires_integer_aircon_target() -> None:
-    with pytest.raises(TypeError, match="target은 정수"):
-        control_device("aircon", mode="cool", target=None)
+def test_control_device_rejects_unknown_aircon_action() -> None:
+    with pytest.raises(ValueError, match="action은 cool, heat, off"):
+        control_device("aircon", action="on")  # type: ignore[arg-type]
 
 
 def test_control_device_rejects_turning_on_induction() -> None:
@@ -243,7 +260,7 @@ def test_control_device_rejects_turning_on_induction() -> None:
 def test_control_device_does_not_change_scenario_data() -> None:
     before = get_device_status("profile-01", "heat")
 
-    control_device("aircon", mode="cool", target=26)
+    control_device("aircon", action="cool")
 
     assert get_device_status("profile-01", "heat") == before
 
@@ -320,6 +337,8 @@ def test_analyze_cctv_delegates_to_haedeun_function(monkeypatch) -> None:
         "fall_suspected": True,
         "description": "거실 바닥에 사람이 쓰러져 있는 것으로 의심됩니다.",
         "confidence": 0.96,
+        "summary": "거실 바닥에 사람이 쓰러져 있는 것으로 의심됩니다.",
+        "status": "analyzed",
     }
 
 
@@ -422,3 +441,41 @@ def test_analyze_cctv_rejects_non_numeric_confidence(monkeypatch) -> None:
 
     with pytest.raises(TypeError, match="confidence는 숫자"):
         analyze_cctv("assets/cctv/fall.jpg")
+
+
+def test_analyze_cctv_allows_missing_optional_confidence(monkeypatch) -> None:
+    monkeypatch.setattr(
+        analyzer,
+        "analyze_cctv_or_unavailable",
+        lambda _image_path: {
+            "person_visible": False,
+            "posture": "none",
+            "fall_suspected": False,
+            "description": "영상에서 사람을 확인할 수 없습니다.",
+        },
+        raising=False,
+    )
+
+    result = analyze_cctv("assets/cctv/normal.jpg")
+
+    assert "confidence" not in result
+    assert result["summary"] == "영상에서 사람을 확인할 수 없습니다."
+    assert result["status"] == "analyzed"
+
+
+def test_analyze_cctv_rejects_out_of_range_confidence(monkeypatch) -> None:
+    monkeypatch.setattr(
+        analyzer,
+        "analyze_cctv_or_unavailable",
+        lambda _image_path: {
+            "person_visible": True,
+            "posture": "standing",
+            "fall_suspected": False,
+            "description": "사람이 서 있습니다.",
+            "confidence": 1.5,
+        },
+        raising=False,
+    )
+
+    with pytest.raises(ValueError, match="0부터 1 사이"):
+        analyze_cctv("assets/cctv/normal.jpg")
