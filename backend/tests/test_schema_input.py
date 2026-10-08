@@ -3,6 +3,7 @@
 # [변경 기록]
 # 2026-10-08 해든: 지혜 님 main 스키마(vital.heart_rate, indoor_environment, devices.induction_minutes)와
 #   확정안 형식(vitals.hr, env, 구조 기기)이 달라 rules.risk.normalize_care_status()를 넣고 같은 결과인지 확인.
+# 2026-10-08 해든 (두나 님 CCTV 연결): status·숫자 confidence 테스트 추가.
 # 2026-10-08 해든 (main 문서 개정판): 스키마에 critical·induction_temperature가 들어가 그대로 씀, 기대값을 docs/scenarios.md 8장으로.
 
 import pytest
@@ -85,3 +86,11 @@ def test_emergency_agent_reads_schema_and_area():
     assert out["risk_level"] == "위급"
     assert asked == ["서울 강남구"]
     assert out["hospital"] == "○○병원 응급실 (1.2km)"
+
+
+def test_cctv_status_and_numeric_confidence_from_analyzer():
+    """두나 님 analyze_cctv 결과(status, 0~1 confidence)를 그대로 넘겨도 판단 불가·확신 낮음을 바로 읽음."""
+    off = normalize_care_status({"cctv": {"status": "unavailable", "available": False, "person_visible": False, "posture": "none"}})
+    assert off["cctv"]["available"] is False
+    low = normalize_care_status({"cctv": {"status": "analyzed", "available": True, "posture": "fallen", "confidence": 0.4}})
+    assert low["cctv"]["confidence"] == "low"

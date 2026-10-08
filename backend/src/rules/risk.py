@@ -48,6 +48,7 @@
 #   - devices.air_conditioner → aircon, induction + induction_minutes(+ induction_temperature) → 구조 {"state","minutes","temperature"}
 #   - cctv.status(analyzed/unavailable/failed) → available, 숫자 confidence → "high"/"low", fall_event.voice_response → watch_response
 #   - 확정안 형식(vitals/env/구조 기기)으로 오면 그대로 둠. evaluate()와 Emergency Agent 입구에서 한 번 부름.
+# 2026-10-08 해든 (두나 님 CCTV 연결): cctv.status가 analyzed가 아니면 항상 판단 불가로 봄. 숫자 confidence는 available 키가 있어도 high/low로 바꿈.
 # 2026-10-08 해든 (main 문서 docs/scenarios.md 개정판에 맞춤): 팀 문서가 "판정은 risk.py를 따른다"로 바뀌며 NEWS2 기준을 적음.
 #   - 위험 범위 = NEWS2 3점 (VITAL_DANGER_FROM_NEWS2 = True, 예전 확정안 범위 VITAL_DANGER는 남겨 둠)
 #   - 실내 이상 28℃ 초과 / 20℃ 미만, 실내 극한 31℃ 초과 / 18℃ 미만 → 경고 (ENABLE_ENV_EXTREME = True)
@@ -638,12 +639,13 @@ def normalize_care_status(care_status) -> dict:
         cs["devices"] = devices
 
     cctv = _plain(cs.get("cctv"))
-    if isinstance(cctv, dict) and "status" in cctv and "available" not in cctv:
+    if isinstance(cctv, dict):
         cctv = dict(cctv)
-        observed = cctv.get("posture") is not None or cctv.get("person_visible") is not None
-        cctv["available"] = cctv["status"] == "analyzed" or (cctv["status"] == "unavailable" and observed)
-        if isinstance(cctv.get("confidence"), (int, float)):
-            cctv["confidence"] = "high" if cctv["confidence"] >= CCTV_SURE_FROM else "low"
+        if "status" in cctv and "available" not in cctv:
+            cctv["available"] = cctv["status"] == "analyzed"      # unavailable·failed는 판단 불가
+        conf = cctv.get("confidence")
+        if isinstance(conf, (int, float)) and not isinstance(conf, bool):
+            cctv["confidence"] = "high" if conf >= CCTV_SURE_FROM else "low"
         if not cctv.get("description"):
             cctv["description"] = cctv.get("summary")
         cs["cctv"] = cctv
