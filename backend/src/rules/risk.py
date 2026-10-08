@@ -12,8 +12,8 @@
 #     바이탈이 정상이어도 낙상 축만으로 위급이 될 수 있음.
 #   - 낙상 상태 5개: none / false_alarm(오탐 가능) / suspected(의심) / confirmed(확인) / critical(위급).
 #   - CCTV_FALL 코드를 FALL_DETECTED(강한 CCTV 신호)와 FALL_SUSPECTED(약한 신호)로 나눔.
-#   - 워치·음성 응답·움직임 없는 시간·머리 충격은 care_status["fall_event"]로 받는 확장 입력 (README 시연엔 없음).
-#   - 낙상 의심이고 음성 응답을 아직 모르면 speaker_check(스피커 상태 확인) 조치를 넣음.
+#   - 워치 버튼 응답·움직임 없는 시간·머리 충격은 care_status["fall_event"]로 받는 확장 입력 (README 시연엔 없음).
+#   - 낙상 의심이고 워치 응답을 아직 모르면 watch_check(워치로 괜찮은지 묻기) 조치를 넣음.
 #   - 케이스 표: notes/낙상-판정-케이스표.md, 테스트: tests/test_fall_cases.py
 # 2026-10-08 해든 (축 정리): 해든 분류 4개로 축을 바꿈 → fall(낙상·보행) / cardio(심뇌) / respiratory(호흡) / environment(환경).
 #   - 바이탈 항목을 축에 나눔: 심박·혈압 → cardio, SpO2 → respiratory, 체온 → environment(고체온·저체온), 인덕션도 environment.
@@ -21,13 +21,28 @@
 #   - "이상 행동", "호흡 곤란 정황", "보행 불안정"은 care_status["signs"] / fall_event로 받는 선택 입력. 시연은 수치만으로 판정.
 #   - 저온 조치는 HEATING_DEVICE(기본 aircon 난방). 보일러 mock이 생기면 "boiler"로 바꿈.
 # 2026-10-08 해든 (승인·119 흐름): "정말 위급하면 119 바로 연결"을 넣음. 흐름 설명은 notes/승인-119-흐름.md.
-#   - 119 즉시 자동 연결 2가지: ① 위급 + 스피커 확인에 어르신 무응답 ② 바이탈 위험 범위 2개 이상 + 점수 합 7점 이상(최신 측정값).
+#   - 119 즉시 자동 연결 2가지: ① 위급 + 워치 확인에 어르신 무응답 ② 바이탈 위험 범위 2개 이상 + 점수 합 7점 이상(최신 측정값).
 #     이때 call_119는 needs_approval False, auto True. 보호자에게는 승인 요청이 아니라 "연락했습니다" 알림이 감.
 #   - 그 밖의 119는 승인 요청 + GUARDIAN_WAIT_119_SEC 안에 보호자 응답이 없으면 자동 연결 (on_timeout "execute").
 #   - 기기 제어는 시간이 지나도 실행하지 않고 다시 알림만 (on_timeout "remind").
 #   - notify_guardian에 알림 종류(kind)와 재알림 시간을 붙임. after_guardian_timeout()으로 시간 초과 처리.
 # 2026-10-08 해든 (5단계 연결): device_call_args()로 조치안 값을 README control_device(device, action) 인자로 바꿈.
 # 2026-10-08 해든 (말투): 스피커 확인 문구를 어르신을 부르는 다정한 말로 바꿈 (SPEAKER_MESSAGE).
+# 2026-10-08 해든 (워치 버튼): 스피커 확인을 워치 버튼 확인으로 바꿈 (speaker_check → watch_check, voice_response → watch_response, VOICE_* → WATCH_*).
+#   워치에 "괜찮으세요?"를 띄우고 "괜찮아요"(ok) / "도와주세요"(help) / 30초 안에 안 누름(none). 판정 규칙은 그대로.
+# 2026-10-08 해든 (시연 시나리오 확정안 반영): 팀 확정안 2장 기준으로 맞춤.
+#   - 바이탈 위험 범위(3점)를 확정안 표로 바꿈: 심박 <50·>110, 수축기 <90·>160, 체온 <35.5·>37.5, 산소포화도 <94.
+#     위험 범위 안쪽의 1~2점("바이탈 변화")은 NEWS2 점수표를 그대로 씀 (VITAL_DANGER, VITAL_BANDS).
+#   - 실내 이상: 30℃ 이상 / 16℃ 이하. 실내 극한(경고)은 확정안에 없어서 끔 (ENABLE_ENV_EXTREME = False).
+#   - 기기 상태를 구조 형식 {"state", "minutes", "temperature"}로 읽음 (예전 "on(2h)" 문자열도 읽음). 인덕션 과열 250℃ 이상 추가.
+#   - 바이탈만으로 119 바로 연결(VITAL_SEVERE)은 끔: 확정안 critical은 119 승인 장면 (ENABLE_AUTO_119_VITAL = False).
+# 2026-10-08 해든 (확정안과 다른 부분 정리): 해든 결정으로 확정안 흐름에 맞춤. 코드는 남기고 설정값으로 끔.
+#   - CCTV가 낙상을 의심하면 확신과 상관없이 위급 (확정안 "CCTV 쓰러짐 의심 → 위급", CCTV_SUSPECT_IS_CRITICAL).
+#     대신 승인 알림에 CCTV 캡처를 붙여 보호자가 사진을 보고 119를 승인하게 함 (notify_guardian.value.cctv_image).
+#     CCTV 판단 불가면 원본 캡처 확인 요청 (확정안 DR-VISION-01).
+#   - 워치 확인(ENABLE_WATCH_CHECK)과 119 바로 연결(ENABLE_AUTO_119)은 끔. 확정안은 119를 모두 보호자 승인 뒤에 검.
+#   - 위험 범위 안쪽의 작은 바이탈 변화만 있으면 정상 (확정안 판정 순서 4). 변화는 "실내 이상 + 바이탈 변화 → 경고"에만 씀
+#     (VITAL_CHANGE_ALONE_RAISES = False). 예: 심박 95만 있으면 예전엔 주의, 지금은 정상.
 #
 # 모든 수치는 시연용 예시 규칙이며 의학적 기준이 아님. 발표 전 출처(NEWS2, 질병관리청, WHO) 원문 확인.
 # 팀원과 겹치는 부분에는 "# [팀 합의] 이름: 설명" 주석을 달았음. 검색: grep -n "팀 합의" risk.py
@@ -46,33 +61,47 @@ VITAL_BANDS = {
     "spo2": {"low": [(3, 91), (2, 93), (1, 95)], "high": []},
 }
 VITAL_LABEL = {"hr": "심박", "sbp": "수축기 혈압", "temp": "체온", "spo2": "산소포화도"}
+# 위험 범위(3점) = 시연 시나리오 확정안 2장 (아래값, 위값). 이 값보다 낮거나 높으면 위험 범위. None이면 그쪽은 보지 않음.
+#   VITAL_BANDS의 3점은 이 범위 밖이라 쓰이지 않고, 범위 안쪽은 최대 2점(바이탈 변화)까지만 준다.
+VITAL_DANGER = {"hr": (50, 110), "sbp": (90, 160), "temp": (35.5, 37.5), "spo2": (94, None)}
 
-# 실내 온도. "이상"은 README 9장의 실내 환경 이상, "극한"은 [D4].
-INDOOR_HOT, INDOOR_COLD = 28.0, 20.0          # 28℃ 초과 / 20℃ 미만 → 실내 이상
-INDOOR_EXTREME_HOT, INDOOR_EXTREME_COLD = 31.0, 18.0   # 31℃ 초과 / 18℃ 미만 → 실내 극한
+# 실내 온도. "이상"은 확정안 2장(30℃ 이상 고온, 16℃ 이하 저온). "극한"은 [D4] 해든 안이었지만 확정안에 없어 끔.
+INDOOR_HOT, INDOOR_COLD = 30.0, 16.0          # 30℃ 이상 / 16℃ 이하 → 실내 이상
+# [팀 합의] 기화 님: 실내 극한을 경고로 올릴지. 켜려면 True로 하고 아래 값을 고온·저온 기준보다 바깥으로 정해 주세요.
+ENABLE_ENV_EXTREME = False
+INDOOR_EXTREME_HOT, INDOOR_EXTREME_COLD = 33.0, 13.0
 
 # 에어컨 목표 온도 = 그 달 쾌적 범위 (해든 결정 10/8). 고온이면 상한, 저온이면 하한으로 맞춘다.
 COMFORT_SUMMER = (24, 26)   # 4~10월
 COMFORT_WINTER = (20, 22)   # 11~3월
 
-# [팀 합의] 두나 님: 인덕션 "오래 켜짐" 기준. mock 표기 "on(2h)"를 분 단위로 읽는다.
+# 인덕션 "오래 켜짐"·"과열" 기준 (확정안 2장). 기기 상태는 {"state": "on", "minutes": 120, "temperature": 300}.
 INDUCTION_LONG_MIN = 60
+INDUCTION_HOT_TEMP = 250
 
 # ---------- 낙상 축 기준값 (시연용 시스템 설정값, 실제 서비스는 의료·응급 전문가 검토 후 정함) ----------
 
 # [팀 합의] 두나 님·지혜 님: 아래 값은 care_status["fall_event"]에 들어오면 쓰고, 없으면 "모름"으로 본다.
-#   README 시연 데이터에는 워치·음성·체류 시간이 없어서, 지금은 CCTV 사진 한 장으로만 판정됨.
+#   README 시연 데이터에는 워치 응답·체류 시간이 없어서, 지금은 CCTV 사진 한 장으로만 판정됨.
 IMMOBILE_LONG_SEC = 60        # 이 시간 이상 움직임 없음 → 바닥 체류로 봄
-SPEAKER_WAIT_SEC = 30         # 스피커 확인 뒤 응답을 기다리는 시간 (해든 설계: 20~30초)
-SPEAKER_MESSAGE = "어르신, 괜찮으세요? 도움이 필요하시면 '도와줘'라고 크게 말씀해 주세요."
-# [팀 합의] 두나 님: 스피커 MCP 도구(예: speaker_check(message, wait_seconds))가 생기기 전에는 False로 두면 조치에서 빠짐.
-ENABLE_SPEAKER_CHECK = True
+WATCH_WAIT_SEC = 30         # 워치 확인 뒤 응답을 기다리는 시간 (해든 설계: 20~30초)
+WATCH_MESSAGE = "어르신, 괜찮으세요? '괜찮아요'나 '도와주세요' 버튼을 눌러 주세요."
+# [팀 합의] 두나 님: 워치 확인 MCP 도구(예: watch_check(message, wait_seconds) → "ok"/"help"/"none")가 생기기 전에는 False로 두면 조치에서 빠짐.
+# [팀 합의] 수언 님: 시연 화면에 워치 버튼 2개("괜찮아요", "도와주세요")와 남은 시간. 30초 안에 안 누르면 "none".
+# 해든 10/8: 확정안 fall 조치(119·응급실·알림)에 맞춰 끔. 시연 뒤 확장 기능으로 켤 수 있음.
+ENABLE_WATCH_CHECK = False
+# 확정안: CCTV 쓰러짐 의심이면 위급. True면 흐린 사진·바닥에 앉음처럼 확신이 낮아도 위급(보호자가 캡처를 보고 승인).
+#   False면 예전 해든 설계(확신 낮으면 낙상 의심 = 경고).
+CCTV_SUSPECT_IS_CRITICAL = True
 UPRIGHT = {"standing", "sitting"}
 
 # ---------- 119 자동 연결·승인 대기 (해든 10/8, 시연용 설정값) ----------
 
 # [팀 합의] 기화 님·지혜 님: README 핵심 원칙 ①("119는 보호자 승인 후에만")에 예외를 둠. 합의 전이면 False로 두면 예전과 같음.
-ENABLE_AUTO_119 = True
+# 해든 10/8: 확정안("119는 보호자 승인 후")에 맞춰 끔. 승인 대기 60초 뒤 자동 연결(on_timeout)은 그대로.
+ENABLE_AUTO_119 = False
+# 바이탈만으로 바로 연결(VITAL_SEVERE). 확정안 critical 시나리오는 "119 호출 승인" 장면이라 끔. 워치 무응답 바로 연결은 그대로.
+ENABLE_AUTO_119_VITAL = False
 # 바이탈 4항목 점수 합. NEWS2 원문은 7항목 합 7점 이상이면 "긴급 대응" (출처 확인 필요: RCP NEWS2 2017).
 #   여기는 4항목만 있어서 실제보다 낮게 나옴 → 7점이면 꽤 심한 상태.
 VITAL_SEVERE_SCORE = 7
@@ -82,26 +111,31 @@ GUARDIAN_REMIND_SEC = 30      # 승인 요청 뒤 응답이 없으면 한 번 �
 AUTO_119_LABEL = {"ELDER_NO_RESPONSE": "어르신 응답 없음", "VITAL_SEVERE": "바이탈 여러 항목 매우 위험"}
 
 # [팀 합의] 지혜 님: 정황 입력 care_status["signs"] = {"abnormal_behavior": bool, "breathing_distress": bool}.
-#   스피커 응답("숨이 차요"), 워치 신호 등에서 옵니다. CCTV LLM이 추측해서 채우지 않음 (진단 금지).
+#   보호자 입력, 워치 신호 등에서 옵니다. CCTV LLM이 추측해서 채우지 않음 (진단 금지).
 #   보행 불안정은 fall_event["gait_unsteady"]. 없으면 "모름"으로 보고 수치만으로 판정.
 # [팀 합의] 두나 님: 보일러 mock 기기와 control_device("boiler", ...)가 생기면 "boiler"로 바꿈. 지금은 README 기기대로 에어컨 난방.
 HEATING_DEVICE = "aircon"
+
+# 위험 범위 안쪽의 작은 변화(NEWS2 1~2점)만 있을 때 주의로 올릴지. 확정안 판정 순서에는 없어서 False (해든 10/8).
+#   False여도 "실내 고온·저온 + 바이탈 변화 → 경고"(ENV_WITH_VITAL)에는 변화를 씀.
+VITAL_CHANGE_ALONE_RAISES = False
+VITAL_CHANGE_CODES = {"CARDIO_CHANGE", "RESP_CHANGE", "BODY_TEMP_CHANGE"}
 
 # 바이탈 항목 → 판정 축
 VITAL_AXIS = {"hr": "cardio", "sbp": "cardio", "spo2": "respiratory", "temp": "environment"}
 
 # 원인 코드 → 기본 단계 (계획서 8.2). None은 단계를 바꾸지 않고 근거에만 표시.
 CAUSE_LEVEL = {
-    # 낙상 축. 신호 코드(VOICE_*, IMMOBILE_LONG, HEAD_IMPACT)는 낙상 신호가 있을 때만 나오고 위급으로 올림.
+    # 낙상 축. 신호 코드(WATCH_*, IMMOBILE_LONG, HEAD_IMPACT)는 낙상 신호가 있을 때만 나오고 위급으로 올림.
     "FALL_DETECTED": "위급",       # CCTV가 바닥에 쓰러진 자세를 분명히 봄 (README "쓰러짐 의심 → 위급")
     "FALL_SUSPECTED": "경고",      # 워치만, 흐린 사진, 확인 안 되는 자세 등 약한 신호
     "FALL_WITH_VITAL_DANGER": "위급",
-    "VOICE_NO_RESPONSE": "위급",
-    "VOICE_HELP": "위급",
+    "WATCH_NO_RESPONSE": "위급",
+    "WATCH_HELP": "위급",
     "IMMOBILE_LONG": "위급",
     "HEAD_IMPACT": "위급",
-    "FALL_FALSE_ALARM": None,      # 낙상 감지 뒤 서 있거나 앉은 모습·음성 응답 확인 → 기록만
-    "VOICE_OK": None,
+    "FALL_FALSE_ALARM": None,      # 낙상 감지 뒤 서 있거나 앉은 모습·워치 응답 확인 → 기록만
+    "WATCH_OK": None,
     "GAIT_UNSTEADY": "주의",            # 낙상·보행: 보행 불안정 정황만 있음
     # 축을 넘는 규칙
     "VITAL_DANGER_MULTI": "위급",       # 위험 범위(3점) 항목 2개 이상 (축이 달라도)
@@ -131,12 +165,12 @@ CAUSE_LABEL = {
     "FALL_DETECTED": "CCTV 쓰러짐 의심",
     "FALL_SUSPECTED": "낙상 의심(확인 필요)",
     "FALL_WITH_VITAL_DANGER": "낙상 의심 + 바이탈 위험",
-    "VOICE_NO_RESPONSE": "음성 호출 무응답",
-    "VOICE_HELP": "도움 요청 음성",
+    "WATCH_NO_RESPONSE": "워치 확인 무응답",
+    "WATCH_HELP": "워치 도움 요청",
     "IMMOBILE_LONG": "오래 움직임 없음",
     "HEAD_IMPACT": "머리 충격 의심",
     "FALL_FALSE_ALARM": "낙상 감지 후 괜찮은 모습 확인",
-    "VOICE_OK": "음성 응답 있음",
+    "WATCH_OK": "워치 괜찮아요 응답",
     "GAIT_UNSTEADY": "보행 불안정 정황",
     "VITAL_DANGER_MULTI": "위험 범위 항목 2개 이상",
     "CARDIO_DANGER": "심박·혈압 위험 범위",
@@ -154,7 +188,7 @@ CAUSE_LABEL = {
     "ENV_EXTREME": "실내 온도 극한",
     "ENV_WITH_VITAL": "실내 온도 이상(바이탈 변화 동반)",
     "ENV_ONLY": "실내 온도 이상",
-    "INDUCTION_UNATTENDED": "사람 없는 곳에서 인덕션 오래 켜짐",
+    "INDUCTION_UNATTENDED": "사람 없는 곳에서 인덕션 오래 켜짐·과열",
     "VITAL_STALE": "이전 측정값 사용",
     "CCTV_UNAVAILABLE": "영상 판단 불가",
 }
@@ -167,7 +201,7 @@ CALL_119_CAUSES = {"VITAL_DANGER_MULTI", "CARDIO_DANGER_WITH_SIGN", "RESP_DANGER
 # 원인 코드가 어느 판정 축에 속하는지. 축마다 따로 단계를 매긴 뒤 가장 높은 축을 쓴다.
 CAUSE_AXIS = {
     "FALL_DETECTED": "fall", "FALL_SUSPECTED": "fall", "FALL_WITH_VITAL_DANGER": "fall",
-    "VOICE_NO_RESPONSE": "fall", "VOICE_HELP": "fall", "IMMOBILE_LONG": "fall", "HEAD_IMPACT": "fall",
+    "WATCH_NO_RESPONSE": "fall", "WATCH_HELP": "fall", "IMMOBILE_LONG": "fall", "HEAD_IMPACT": "fall",
     "GAIT_UNSTEADY": "fall",
     "CARDIO_DANGER": "cardio", "CARDIO_CHANGE": "cardio", "BEHAVIOR_CHANGE": "cardio",
     "CARDIO_WITH_SIGN": "cardio", "CARDIO_DANGER_WITH_SIGN": "cardio",
@@ -187,6 +221,13 @@ def vital_score(name: str, value: float | None) -> int | None:
     """항목 하나의 0~3점. 값이 없으면 None."""
     if value is None:
         return None
+    low, high = VITAL_DANGER[name]
+    if (low is not None and value < low) or (high is not None and value > high):
+        return 3
+    return min(_news2_score(name, value), 2)
+
+
+def _news2_score(name: str, value: float) -> int:
     bands = VITAL_BANDS[name]
     for score, limit in bands["low"]:
         if value <= limit:
@@ -209,13 +250,13 @@ def indoor_state(temp: float | None) -> str:
     """normal / hot / cold / extreme_hot / extreme_cold. 값이 없으면 normal (실내 정보 없이 진행)."""
     if temp is None:
         return "normal"
-    if temp > INDOOR_EXTREME_HOT:
+    if ENABLE_ENV_EXTREME and temp > INDOOR_EXTREME_HOT:
         return "extreme_hot"
-    if temp < INDOOR_EXTREME_COLD:
+    if ENABLE_ENV_EXTREME and temp < INDOOR_EXTREME_COLD:
         return "extreme_cold"
-    if temp > INDOOR_HOT:
+    if temp >= INDOOR_HOT:
         return "hot"
-    if temp < INDOOR_COLD:
+    if temp <= INDOOR_COLD:
         return "cold"
     return "normal"
 
@@ -226,10 +267,26 @@ def comfort_range(month: int) -> tuple[int, int]:
 
 # ---------- 기기 ----------
 
-# [팀 합의] 두나 님: get_device_status의 인덕션 값 형식. 지금은 "off", "on", "on(2h)", "on(90m)"만 읽는다.
-#   켜진 시간을 숫자 키(예: induction_on_min)로 따로 주면 더 정확하다.
-def induction_on_minutes(status: str | None) -> int | None:
+# [팀 합의] 두나 님: get_device_status 기기 값은 확정안 형식 {"state": "on", "minutes": 120, "temperature": 300}.
+#   예전 문자열("off", "on", "on(2h)", "on(90m)")도 읽는다.
+def device_state(value) -> str:
+    """"on" / "off" / ""(모름)."""
+    if isinstance(value, dict):
+        return str(value.get("state") or "")
+    return "on" if isinstance(value, str) and value.startswith("on") else (value or "")
+
+
+def induction_hot(value) -> bool:
+    """켜져 있고 표면 온도가 INDUCTION_HOT_TEMP 이상."""
+    return isinstance(value, dict) and value.get("state") == "on" and (value.get("temperature") or 0) >= INDUCTION_HOT_TEMP
+
+
+def induction_on_minutes(status) -> int | None:
     """켜져 있지 않으면 0, 켜졌는데 시간을 모르면 None."""
+    if isinstance(status, dict):
+        if status.get("state") != "on":
+            return 0
+        return status.get("minutes")
     if not status or not status.startswith("on"):
         return 0
     inside = status[status.find("(") + 1:status.find(")")] if "(" in status else ""
@@ -255,37 +312,39 @@ def detect_fall(care_status: dict, vital_danger: int = 0) -> tuple[list[str], st
     confident = ok and cctv.get("confidence", "high") != "low"
     cctv_flag = ok and bool(cctv.get("fall_suspected"))
     upright = ok and cctv.get("person_visible") is not False and posture in UPRIGHT
-    voice = event.get("voice_response")              # "ok" / "help" / "none" / None(모름)
+    answer = event.get("watch_response")              # "ok" / "help" / "none" / None(모름)
     immobile = event.get("immobile_seconds")
     watch = event.get("watch_fall") is True
 
     # 1) 낙상 신호의 세기
     if ok and posture == "fallen" and confident:                       # [D2] 자세가 fallen이면 플래그와 상관없이
         base = "FALL_DETECTED"
+    elif ok and (posture == "fallen" or cctv_flag) and CCTV_SUSPECT_IS_CRITICAL:   # 확정안: CCTV 의심 → 위급
+        base = "FALL_DETECTED"
     elif ok and (posture == "fallen" or cctv_flag):                    # 흐린 사진, 자세와 플래그가 어긋남
         base = "FALL_SUSPECTED"
     elif watch:
         base = "FALL_SUSPECTED"
-    elif ok and posture == "lying" and (voice == "none" or (immobile or 0) >= IMMOBILE_LONG_SEC):
+    elif ok and posture == "lying" and (answer == "none" or (immobile or 0) >= IMMOBILE_LONG_SEC):
         base = "FALL_SUSPECTED"                                        # [D3] lying만으로는 안 올리고, 신호가 더 있을 때만
     else:
         return [], "none"
 
     # 2) 오탐 가능 → 기록만. 약한 신호이고 바닥 자세가 아니면서,
-    #    음성으로 괜찮다고 답했거나, CCTV 스스로는 낙상을 의심하지 않는데 서 있거나 앉은 모습일 때.
+    #    워치에서 "괜찮아요"를 눌렀거나, CCTV 스스로는 낙상을 의심하지 않는데 서 있거나 앉은 모습일 때.
     #    CCTV가 낙상을 의심했는데 "앉아 있음"이면 바닥에 앉은 것일 수 있어 오탐으로 보지 않는다.
-    if base == "FALL_SUSPECTED" and posture != "fallen" and voice != "none" and \
-            (voice == "ok" or (upright and not cctv_flag)):
-        return ["FALL_FALSE_ALARM"] + (["VOICE_OK"] if voice == "ok" else []), "false_alarm"
+    if base == "FALL_SUSPECTED" and posture != "fallen" and answer != "none" and \
+            (answer == "ok" or (upright and not cctv_flag)):
+        return ["FALL_FALSE_ALARM"] + (["WATCH_OK"] if answer == "ok" else []), "false_alarm"
 
     # 3) 추가 신호로 올리기
     codes = [base]
-    if voice == "none":
-        codes.append("VOICE_NO_RESPONSE")
-    elif voice == "help":
-        codes.append("VOICE_HELP")
-    elif voice == "ok":
-        codes.append("VOICE_OK")
+    if answer == "none":
+        codes.append("WATCH_NO_RESPONSE")
+    elif answer == "help":
+        codes.append("WATCH_HELP")
+    elif answer == "ok":
+        codes.append("WATCH_OK")
     if (immobile or 0) >= IMMOBILE_LONG_SEC:
         codes.append("IMMOBILE_LONG")
     if event.get("head_impact_suspected"):
@@ -293,9 +352,9 @@ def detect_fall(care_status: dict, vital_danger: int = 0) -> tuple[list[str], st
     if vital_danger >= 1:
         codes.append("FALL_WITH_VITAL_DANGER")
 
-    if {"VOICE_NO_RESPONSE", "HEAD_IMPACT", "FALL_WITH_VITAL_DANGER"} & set(codes):
+    if {"WATCH_NO_RESPONSE", "HEAD_IMPACT", "FALL_WITH_VITAL_DANGER"} & set(codes):
         state = "critical"
-    elif base == "FALL_DETECTED" or {"VOICE_HELP", "IMMOBILE_LONG"} & set(codes):
+    elif base == "FALL_DETECTED" or {"WATCH_HELP", "IMMOBILE_LONG"} & set(codes):
         state = "confirmed"
     else:
         state = "suspected"
@@ -343,8 +402,10 @@ def detect_causes(care_status: dict) -> list[str]:
         causes.append("ENV_WITH_VITAL" if changed else "ENV_ONLY")
 
     # 사람이 안 보이는지는 CCTV로만 안다. 켜진 시간을 모르면 위험한 쪽(오래 켜짐)으로 본다.
-    minutes = induction_on_minutes((care_status.get("devices") or {}).get("induction"))
-    if cctv_ok and cctv.get("person_visible") is False and (minutes is None or minutes >= INDUCTION_LONG_MIN):
+    induction = (care_status.get("devices") or {}).get("induction")
+    minutes = induction_on_minutes(induction)
+    if cctv_ok and cctv.get("person_visible") is False and \
+            (minutes is None or minutes >= INDUCTION_LONG_MIN or induction_hot(induction)):
         causes.append("INDUCTION_UNATTENDED")
 
     if vitals.get("source") == "cache":
@@ -354,11 +415,18 @@ def detect_causes(care_status: dict) -> list[str]:
     return causes
 
 
+def cause_level(code: str) -> str | None:
+    """원인 코드의 단계. 작은 바이탈 변화는 VITAL_CHANGE_ALONE_RAISES가 False면 단계를 올리지 않음(근거에만 표시)."""
+    if code in VITAL_CHANGE_CODES and not VITAL_CHANGE_ALONE_RAISES:
+        return None
+    return CAUSE_LEVEL.get(code)
+
+
 def axis_levels(causes: list[str]) -> dict:
     """축별 단계 (취약도 보정 전)."""
     out = {axis: "정상" for axis in AXES}   # 예: {"fall": "위급", "cardio": "주의", "respiratory": "정상", "environment": "정상"}
     for c in causes:
-        axis, level = CAUSE_AXIS.get(c), CAUSE_LEVEL.get(c)
+        axis, level = CAUSE_AXIS.get(c), cause_level(c)
         if axis and level and LEVELS.index(level) > LEVELS.index(out[axis]):
             out[axis] = level
     return out
@@ -390,7 +458,8 @@ REASON_MAX = 60   # llm/prompts.py의 reason 길이 제한과 같음 (템플릿�
 def reason_text(causes: list[str]) -> str:
     """LLM이 실패했을 때 쓰는 판정 근거. 높은 단계 원인부터 60자 안에서 이어 붙임.
     예: "CCTV 쓰러짐 의심 + 심박·혈압 변화". 개별 위험 범위가 보이면 "2개 이상" 문구는 생략."""
-    shown = [c for c in causes if not (c == "VITAL_DANGER_MULTI" and len(VITAL_CAUSES & set(causes)) > 1)]
+    shown = [c for c in causes if not (c == "VITAL_DANGER_MULTI" and len(VITAL_CAUSES & set(causes)) > 1)
+             and not (c == "FALL_WITH_VITAL_DANGER" and VITAL_CAUSES & set(causes))]   # 낙상 + 개별 위험 범위가 보이면 겹치는 말 생략
     rank = lambda c: LEVELS.index(CAUSE_LEVEL[c]) if CAUSE_LEVEL.get(c) else -1
     text = ""
     for c in sorted(shown, key=rank, reverse=True):     # sorted는 같은 단계끼리 원래 순서를 지킴
@@ -409,28 +478,29 @@ def reason_text(causes: list[str]) -> str:
 #   Summary가 "실패, 직접 조치가 필요합니다"로 보호자에게 알림 (device_fail 상황).
 def auto_119_reason(care_status: dict, causes: list[str], level: str) -> str | None:
     """보호자 승인 없이 119에 바로 연결할 이유. 없으면 None.
-    ① 위급인데 스피커 확인에 어르신이 응답하지 않음 (애플워치 낙상 감지처럼 무응답이면 바로 신고)
+    ① 위급인데 워치 확인에 어르신이 응답하지 않음 (애플워치 낙상 감지처럼 무응답이면 바로 신고)
     ② 바이탈 위험 범위 2개 이상 + 점수 합 7점 이상. 이전 측정값(캐시)이면 센서 오류일 수 있어 자동 연결하지 않음."""
     if not ENABLE_AUTO_119 or level != "위급":
         return None
-    if (care_status.get("fall_event") or {}).get("voice_response") == "none":
+    if (care_status.get("fall_event") or {}).get("watch_response") == "none":
         return "ELDER_NO_RESPONSE"
     total = sum(vital_scores(care_status.get("vitals")).values())
-    if "VITAL_DANGER_MULTI" in causes and total >= VITAL_SEVERE_SCORE and "VITAL_STALE" not in causes:
+    if ENABLE_AUTO_119_VITAL and "VITAL_DANGER_MULTI" in causes and total >= VITAL_SEVERE_SCORE and \
+            "VITAL_STALE" not in causes:
         return "VITAL_SEVERE"
     return None
 
 
 # [팀 합의] 지혜 님: actions 형식은 README EmergencyResult와 같게 {"type", "needs_approval", "value"}에
 #   119는 auto·auto_reason 또는 timeout_seconds·on_timeout, 기기는 on_timeout, 보호자 알림은 value.kind가 더 붙음.
-#   순서는 119 → 스피커 확인 → 기기 제어 → 병원 정보 → 보호자 알림 (README 예시와 순서가 다름, 승인 화면 순서 확인 필요).
+#   순서는 119 → 워치 확인 → 기기 제어 → 병원 정보 → 보호자 알림 (README 예시와 순서가 다름, 승인 화면 순서 확인 필요).
 # [팀 합의] 두나 님: control_device 값 형식(device, mode, target / action)을 MCP 도구 인자와 맞춰야 함.
 #   승인 화면은 notify_guardian.value.kind로 나눔: approval_request(승인 버튼) / emergency_alert(버튼 없이 긴급 알림) / info.
 def select_actions(causes: list[str], level: str, month: int, indoor: str = "normal",
-                   speaker_check: bool = False, auto_119: str | None = None) -> list[dict]:
+                   watch_check: bool = False, auto_119: str | None = None) -> list[dict]:
     """조치 종류는 코드가 정한다. LLM은 더하거나 빼지 못하고 설명만 쓴다 [D6].
     indoor는 indoor_state() 결과. 에어컨을 냉방으로 켤지 난방으로 켤지 정할 때만 쓴다.
-    speaker_check는 낙상 신호가 있는데 음성 응답을 아직 모를 때 True (evaluate가 정함).
+    watch_check는 낙상 신호가 있는데 워치 응답을 아직 모를 때 True (evaluate가 정함).
     auto_119는 auto_119_reason() 결과. 있으면 119를 승인 없이 바로 연결한다."""
     if level == "정상":
         return []
@@ -443,9 +513,9 @@ def select_actions(causes: list[str], level: str, month: int, indoor: str = "nor
     elif fall_critical or CALL_119_CAUSES & set(causes) or (level == "위급" and fall_any):
         actions.append({"type": "call_119", "needs_approval": True,
                         "timeout_seconds": GUARDIAN_WAIT_119_SEC, "on_timeout": "execute"})
-    if speaker_check and ENABLE_SPEAKER_CHECK:
-        actions.append({"type": "speaker_check", "needs_approval": False,
-                        "value": {"message": SPEAKER_MESSAGE, "wait_seconds": SPEAKER_WAIT_SEC}})
+    if watch_check and ENABLE_WATCH_CHECK:
+        actions.append({"type": "watch_check", "needs_approval": False,
+                        "value": {"message": WATCH_MESSAGE, "wait_seconds": WATCH_WAIT_SEC}})
 
     if {"ENV_EXTREME", "ENV_WITH_VITAL", "ENV_ONLY"} & set(causes):
         # 저온은 HEATING_DEVICE로 난방 (README 기기에 보일러가 없어 기본은 에어컨 난방)
@@ -476,6 +546,19 @@ def select_actions(causes: list[str], level: str, month: int, indoor: str = "nor
     return actions
 
 
+# [팀 합의] 두나 님·수언 님: 보호자 알림에 CCTV 캡처를 붙이는 경우. notify_guardian.value에
+#   cctv_image(이미지 경로)와 cctv_check("fall": 낙상 의심 사진을 보고 판단 / "unavailable": 판단 불가, 원본 확인)가 들어감.
+#   승인 화면·휴대폰 알림에 이 사진을 같이 보여 주세요 (확정안 7장 4번 "캡처와 함께 승인 요청", 8번 "원본 캡처 확인 요청").
+def attach_cctv(actions: list[dict], care_status: dict, causes: list[str]) -> list[dict]:
+    cctv = care_status.get("cctv") or {}
+    check = "unavailable" if "CCTV_UNAVAILABLE" in causes else \
+        "fall" if {"FALL_DETECTED", "FALL_SUSPECTED"} & set(causes) else None
+    if not check or not cctv.get("image_path"):
+        return actions
+    return [dict(a, value={**a["value"], "cctv_image": cctv["image_path"], "cctv_check": check})
+            if a["type"] == "notify_guardian" else a for a in actions]
+
+
 # [팀 합의] 두나 님: README MCP 도구는 control_device(device, action) 두 인자. 조치안 값을 이 함수로 바꿔 부르면 됨.
 #   에어컨: ("aircon", "on", {"mode": "cool", "target": 26}) → control_device("aircon", "on", mode="cool", target=26)
 #   인덕션: ("induction", "off", {}) → control_device("induction", "off"). mode·target을 받을 수 있게 도구 인자를 늘려 주세요.
@@ -504,8 +587,8 @@ def evaluate(care_status: dict, month: int) -> dict:
     indoor = indoor_state((care_status.get("env") or {}).get("temp"))
     danger = sum(1 for s in vital_scores(care_status.get("vitals")).values() if s == 3)
     _, fall_state = detect_fall(care_status, danger)
-    voice_unknown = (care_status.get("fall_event") or {}).get("voice_response") is None
-    speaker = fall_state in ("suspected", "confirmed", "critical") and voice_unknown
+    answer_unknown = (care_status.get("fall_event") or {}).get("watch_response") is None
+    ask_watch = fall_state in ("suspected", "confirmed", "critical") and answer_unknown
     auto = auto_119_reason(care_status, causes, level)
     return {
         "risk_level": level,
@@ -515,5 +598,5 @@ def evaluate(care_status: dict, month: int) -> dict:
         "reason": reason_text(causes),
         "vital_scores": vital_scores(care_status.get("vitals")),
         "auto_119": auto,
-        "actions": select_actions(causes, level, month, indoor, speaker, auto),
+        "actions": attach_cctv(select_actions(causes, level, month, indoor, ask_watch, auto), care_status, causes),
     }

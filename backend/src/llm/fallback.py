@@ -12,6 +12,10 @@
 #   알림 문구는 LLM을 기다리지 않고 바로 보내야 해서 모두 코드 템플릿. 흐름: notes/승인-119-흐름.md
 # 2026-10-08 해든 (말투): 어르신 문장은 다정한 간호사처럼 "어르신,"으로 시작해 챙기는 한 마디를 넣고,
 #   위급 알림·안내는 "지금 바로 ~하세요"처럼 단호하게 바꿈. 어르신 문장 길이 40 → 60자.
+# 2026-10-08 해든 (CCTV 캡처): 승인 알림에 CCTV 캡처를 붙인 경우 "CCTV 캡처를 보고 판단하세요" /
+#   판단 불가면 "원본 캡처를 직접 확인하세요" 한 문장을 넣음 (CCTV_CHECK_TEXT).
+# 2026-10-08 해든 (워치 버튼): 스피커 대신 워치 버튼 확인(watch_check). 거절 템플릿에 판정 근거를 붙이고(120자 안일 때),
+#   체온 원인이면 어르신 안내에 하실 일(ctx["elder_care"])을 씀.
 # 2026-10-08 해든 (현실 상황 점검): 보호자 문장 끝은 prompts.next_step() 그대로, 거절이어도 어르신께 짧게 안내,
 #   기기 실패면 어르신께 솔직하게 말하고 직접 하실 일 안내(ELDER_TIP), 119 안내에 "구급대가 오고 있어요" 안심 한 마디.
 #
@@ -34,8 +38,8 @@ def action_label(action: dict) -> str:
         return "보호자에게 상황 알림"
     if kind == "hospital_info":
         return "가까운 병원 정보 안내"
-    if kind == "speaker_check":
-        return "스피커로 상태 확인"
+    if kind == "watch_check":
+        return "워치로 상태 확인"
     if kind == "control_device":
         device = DEVICE_LABEL.get(value.get("device"), value.get("device", "기기"))
         if value.get("action") == "off":
@@ -58,14 +62,20 @@ def fallback_emergency(ctx: dict) -> dict:
 
 # [팀 합의] 지혜 님·두나 님: 승인 대기 응답(pending_approval) 때 보호자 휴대폰에 보내는 첫 알림 문구.
 #   README 7장 FALLBACK 문장에서 말투를 바꿈 (위급은 "[긴급] … 지금 바로 화면에서 조치를 승인하세요"). README 문장도 같이 고쳐 주세요.
+CCTV_CHECK_TEXT = {"fall": "CCTV 캡처를 보고 판단하세요.",
+                   "unavailable": "CCTV 판단이 안 돼 원본 캡처를 직접 확인하세요."}
+
+
 def pending_guardian_message(risk_level: str, reason: str, actions: list[dict] | None = None) -> str:
     wait = [a["timeout_seconds"] for a in actions or [] if a["type"] == "call_119" and a.get("on_timeout") == "execute"]
-    if risk_level == "위급":      # 위급은 단호하게: 무슨 일인지 → 지금 할 일 → 자동 연결 안내
-        text = f"[긴급] 어르신이 위급합니다. 판정 근거: {reason}. 지금 바로 화면에서 조치를 승인하세요."
+    note = next((a["value"].get("cctv_check") for a in actions or [] if a["type"] == "notify_guardian"), None)
+    cctv = f" {CCTV_CHECK_TEXT[note]}" if note in CCTV_CHECK_TEXT else ""
+    if risk_level == "위급":      # 위급은 단호하게: 무슨 일인지 → 사진 → 지금 할 일 → 자동 연결 안내
+        text = f"[긴급] 어르신이 위급합니다. 판정 근거: {reason}.{cctv} 지금 바로 화면에서 조치를 승인하세요."
         if wait:
             text += f" {wait[0]}초 안에 응답이 없으면 119에 자동으로 연락합니다."
         return text
-    return f"[확인 요청] 어르신 상태를 살펴봐 주세요. 위험도 {risk_level}. 판정 근거: {reason}. 화면에서 조치를 승인해 주세요."
+    return f"[확인 요청] 어르신 상태를 살펴봐 주세요. 위험도 {risk_level}. 판정 근거: {reason}.{cctv} 화면에서 조치를 승인해 주세요."
 
 
 # [팀 합의] 지혜 님·두나 님: 승인 요청 뒤 GUARDIAN_REMIND_SEC 동안 응답이 없을 때 한 번 더 보내는 알림.
@@ -78,7 +88,7 @@ def reminder_guardian_message(risk_level: str, seconds_left: int | None = None) 
     return f"[다시 알림] 어르신 위험도 {risk_level}, 아직 승인 응답이 없습니다. 화면을 확인해 주세요."
 
 
-AUTO_119_WHY = {"ELDER_NO_RESPONSE": "어르신이 스피커 확인에 응답하지 않아",
+AUTO_119_WHY = {"ELDER_NO_RESPONSE": "어르신이 워치 확인에 응답하지 않아",
                 "VITAL_SEVERE": "바이탈 여러 항목이 매우 위험해",
                 "GUARDIAN_TIMEOUT": "보호자 응답이 없어"}
 
@@ -115,11 +125,17 @@ def _elder_done(labels: list[str]) -> str:
     return ELDER_DONE
 
 
+def _elder_care(ctx: dict) -> str | None:
+    care = ctx.get("elder_care")
+    return f"어르신, {care[0]}" if care and len(care[0]) + 5 <= 60 else None
+
+
 def fallback_summary(ctx: dict) -> dict:
     """상황별 고정 문구. ctx는 prompts.build_summary_ctx() 결과. 보호자 문장 끝에는 ctx["next_step"]을 그대로 붙인다."""
     level, nxt = ctx["risk_level"], " " + ctx["next_step"]
     if ctx["situation"] == "rejected":
-        return {"guardian_message": f"보호자 거절로 조치 없이 기록했습니다. 위험도 {level}.{nxt}",
+        text = f"{ctx['reason'].rstrip('.')}. 보호자 거절로 조치 없이 기록했습니다. 위험도 {level}.{nxt}"
+        return {"guardian_message": text if len(text) <= 120 else f"보호자 거절로 조치 없이 기록했습니다. 위험도 {level}.{nxt}",
                 "elder_message": ELDER_REJECTED if ELDER_MESSAGE_ON_REJECT else ""}
 
     if ctx["situation"] in ("auto_119", "timeout_119"):
@@ -143,10 +159,12 @@ def fallback_summary(ctx: dict) -> dict:
         return {"guardian_message": guardian + nxt, "elder_message": ELDER_119}
 
     if ctx["situation"] == "info":
-        spoke = "스피커로 어르신께 말을 걸었습니다. " if "speaker_check" in ctx["succeeded_types"] else ""
+        spoke = "워치로 어르신께 괜찮은지 물었습니다. " if "watch_check" in ctx["succeeded_types"] else ""
         text = f"{spoke}{ctx['reason'].rstrip('.')}. 위험도 {level}.{nxt}"
-        return {"guardian_message": text if len(text) <= 120 else f"{spoke}위험도 {level}.{nxt}", "elder_message": ELDER_INFO}
+        return {"guardian_message": text if len(text) <= 120 else f"{spoke}위험도 {level}.{nxt}",
+                "elder_message": _elder_care(ctx) or ELDER_INFO}
 
     done = ", ".join(ctx["succeeded_labels"]) or "조치"
     return {"guardian_message": f"승인하신 조치({done})를 실행했습니다. 위험도 {level}.{nxt}",
-            "elder_message": _elder_done(ctx["succeeded_labels"])}
+            "elder_message": _elder_done(ctx["succeeded_labels"]) if _elder_done(ctx["succeeded_labels"]) != ELDER_DONE
+            else _elder_care(ctx) or ELDER_DONE}

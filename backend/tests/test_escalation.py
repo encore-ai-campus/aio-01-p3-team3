@@ -3,6 +3,10 @@
 # [변경 기록]
 # 2026-10-08 해든: 새 파일. rules/risk.py의 119 자동 연결(auto_119_reason)과 시간 초과 처리,
 #   fallback.py 알림 문구, Summary auto_119·timeout_119 상황을 확인. 흐름: notes/승인-119-흐름.md
+# 2026-10-08 해든 (워치 버튼): 스피커 확인 이름을 워치 버튼 확인(watch_check, watch_response)으로 바꿈.
+# 2026-10-08 해든 (시연 시나리오 확정안): 바이탈만으로 바로 연결(VITAL_SEVERE)은 기본 꺼짐 → critical은 119 승인 요청.
+#   켰을 때 동작은 monkeypatch로 따로 확인.
+# 2026-10-08 해든 (확정안과 다른 부분 정리): 119 바로 연결·워치 확인은 시연에서 꺼 둠. 이 파일은 extended_design으로 켜고 확인.
 
 import json
 
@@ -14,7 +18,7 @@ from src.agents.summary import run_summary
 from src.llm.fallback import emergency_alert_message, pending_guardian_message, reminder_guardian_message
 from src.llm.prompts import build_summary_ctx, validate_summary
 from src.rules.risk import after_guardian_timeout, evaluate
-from tests.test_fall_cases import CRITICAL_VITALS, NORMAL_VITALS, cam, case
+from tests.test_fall_cases import CRITICAL_VITALS, NORMAL_VITALS, cam, case, extended_design  # noqa: F401 (확장 설계 켜기)
 from tests.test_risk_rules import SCENARIOS
 
 
@@ -33,11 +37,11 @@ def full(name, **extra):
 # ---------- 언제 119가 바로 가는가 ----------
 
 @pytest.mark.parametrize("desc, care_status, auto", [
-    ("쓰러짐 + 무응답", case(cam("fallen", True), {"voice_response": "none"}), "ELDER_NO_RESPONSE"),
-    ("누워 있음 + 무응답", case(cam("lying"), {"voice_response": "none"}), "ELDER_NO_RESPONSE"),
-    ("README critical (바이탈 3개 위험)", full("critical"), "VITAL_SEVERE"),
+    ("쓰러짐 + 무응답", case(cam("fallen", True), {"watch_response": "none"}), "ELDER_NO_RESPONSE"),
+    ("누워 있음 + 무응답", case(cam("lying"), {"watch_response": "none"}), "ELDER_NO_RESPONSE"),
+    ("확정안 critical (바이탈 3개 위험) → 승인 요청", full("critical"), None),
     ("쓰러짐만 (응답 모름)", case(cam("fallen", True)), None),
-    ("쓰러짐 + 도와달라는 음성", case(cam("fallen", True), {"voice_response": "help"}), None),
+    ("쓰러짐 + 워치 '도와주세요' 버튼", case(cam("fallen", True), {"watch_response": "help"}), None),
     ("README fall (바이탈 1~2점 변화)", full("fall"), None),
 ])
 def test_auto_119_cases(desc, care_status, auto):
@@ -56,9 +60,15 @@ def test_stale_vitals_do_not_auto_call():
 
 
 def test_no_response_but_not_critical_level_does_not_call():
-    # 낙상 신호 없이 음성만 무응답 → 낙상 축이 안 올라가 위급이 아님 → 119 없음
-    r = evaluate(case(cam("sitting"), {"voice_response": "none"}), month=8)
+    # 낙상 신호 없이 워치만 무응답 → 낙상 축이 안 올라가 위급이 아님 → 119 없음
+    r = evaluate(case(cam("sitting"), {"watch_response": "none"}), month=8)
     assert r["risk_level"] == "정상" and call_119(r) is None
+
+
+def test_vital_severe_auto_when_switched_on(monkeypatch):
+    monkeypatch.setattr(risk, "ENABLE_AUTO_119_VITAL", True)
+    r = evaluate(full("critical"), month=8)
+    assert r["auto_119"] == "VITAL_SEVERE" and call_119(r)["needs_approval"] is False
 
 
 def test_auto_119_switch_off(monkeypatch):
@@ -97,7 +107,7 @@ def test_alert_messages():
     assert "60초" not in pending_guardian_message("주의", "인덕션", evaluate(full("induction"), month=8)["actions"])
     assert reminder_guardian_message("위급", 30).endswith("30초 뒤 119에 자동으로 연락합니다.")
     msg = emergency_alert_message("심박 위험 범위", "ELDER_NO_RESPONSE", "○○병원 응급실 (1.2km)")
-    assert msg.startswith("[긴급] 어르신이 스피커 확인에 응답하지 않아 119에 바로 연락했습니다")
+    assert msg.startswith("[긴급] 어르신이 워치 확인에 응답하지 않아 119에 바로 연락했습니다")
 
 
 # ---------- Summary ----------
@@ -105,7 +115,8 @@ def test_alert_messages():
 EXECUTED_119 = [{"action": "call_119", "result": "success"}, {"action": "notify_guardian", "result": "success"}]
 
 
-def test_auto_119_summary_template():
+def test_auto_119_summary_template(monkeypatch):
+    monkeypatch.setattr(risk, "ENABLE_AUTO_119_VITAL", True)
     em = run_emergency(full("critical"), find_hospital=lambda area: "○○병원 응급실 (1.2km)", month=8)
     assert em["actions"][0]["label"] == "119 바로 연결" and em["actions"][0]["needs_approval"] is False
     sm = run_summary(em, approved=False, executed=EXECUTED_119, decided_by="auto")
@@ -147,8 +158,8 @@ def test_auto_templates_pass_validation(name, decided_by):
 
 
 def test_info_situation_has_no_approval_word():
-    em = run_emergency(case(cam("fallen", True, confidence="low")), month=8)     # 의심: 스피커·알림만
-    ctx = build_summary_ctx(em["context"], True, [{"action": "speaker_check", "result": "success"},
+    em = run_emergency(case(cam("fallen", True, confidence="low")), month=8)     # 의심: 워치 확인·알림만
+    ctx = build_summary_ctx(em["context"], True, [{"action": "watch_check", "result": "success"},
                                                   {"action": "notify_guardian", "result": "success"}])
     assert ctx["situation"] == "info"
     sm = run_summary(em, approved=True, executed=[{"action": "notify_guardian", "result": "success"}])

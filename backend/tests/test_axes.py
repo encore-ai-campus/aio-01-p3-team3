@@ -6,6 +6,7 @@
 #   2. 심뇌 위험: 심박·혈압 + 이상 행동    → cardio
 #   3. 호흡 위험: SpO2 + 호흡 곤란 정황    → respiratory
 #   4. 환경 위험: 실내 고온·저온(+체온·인덕션) + 에어컨/보일러 제어 → environment
+# 2026-10-08 해든 (확정안 판정 순서): 위험 범위 안쪽 작은 바이탈 변화만으로는 정상 (VITAL_CHANGE_ALONE_RAISES = False).
 
 import pytest
 
@@ -29,10 +30,10 @@ def run(vitals=None, signs=None, **kw):
 
 @pytest.mark.parametrize("name, axes", [
     ("normal", {"fall": "정상", "cardio": "정상", "respiratory": "정상", "environment": "정상"}),
-    ("heat", {"fall": "정상", "cardio": "주의", "respiratory": "정상", "environment": "경고"}),
+    ("heat", {"fall": "정상", "cardio": "정상", "respiratory": "정상", "environment": "경고"}),    # 체온 37.8 위험 범위
     ("induction", {"fall": "정상", "cardio": "정상", "respiratory": "정상", "environment": "주의"}),
-    ("fall", {"fall": "위급", "cardio": "주의", "respiratory": "주의", "environment": "정상"}),
-    ("critical", {"fall": "정상", "cardio": "경고", "respiratory": "경고", "environment": "주의"}),
+    ("fall", {"fall": "위급", "cardio": "경고", "respiratory": "정상", "environment": "정상"}),    # 심박 118 위험 범위
+    ("critical", {"fall": "정상", "cardio": "경고", "respiratory": "경고", "environment": "정상"}),
 ])
 def test_readme_scenarios_axes(name, axes):
     assert evaluate(care(name), month=8)["axes"] == axes
@@ -48,7 +49,7 @@ def test_multi_danger_across_axes_is_critical():
 
 # 심뇌
 @pytest.mark.parametrize("vitals, signs, level", [
-    (v(hr=95), None, "주의"),                                  # 심박 변화
+    (v(hr=95), None, "정상"),                                  # 심박 변화만 → 정상 (확정안 판정 순서 4)
     (None, {"abnormal_behavior": True}, "주의"),               # 이상 행동 정황만
     (v(hr=95), {"abnormal_behavior": True}, "경고"),           # 변화 + 정황
     (v(sbp=230), None, "경고"),                                # 혈압 위험 범위
@@ -66,9 +67,9 @@ def test_cardio_danger_with_sign_calls_119():
 
 # 호흡
 @pytest.mark.parametrize("vitals, signs, level", [
-    (v(spo2=94), None, "주의"),
+    (v(spo2=94), None, "정상"),                                # 변화만 → 정상
     (None, {"breathing_distress": True}, "주의"),
-    (v(spo2=93), {"breathing_distress": True}, "경고"),
+    (v(spo2=95), {"breathing_distress": True}, "경고"),
     (v(spo2=90), None, "경고"),
     (v(spo2=90), {"breathing_distress": True}, "위급"),
 ])
@@ -80,9 +81,9 @@ def test_respiratory_axis(vitals, signs, level):
 # 환경 (체온 포함)
 @pytest.mark.parametrize("vitals, env, level", [
     (v(temp=40.2), {"temp": 24}, "경고"),       # 고체온 위험 범위 (실내 정상)
-    (v(temp=38.5), {"temp": 24}, "주의"),       # 체온 변화
-    (v(temp=34.8), {"temp": 17}, "경고"),       # 저체온 + 실내 극한
-    (None, {"temp": 29}, "주의"),               # 실내 이상만
+    (v(temp=35.8), {"temp": 24}, "정상"),       # 체온 변화만 → 정상 (위험 범위 안쪽)
+    (v(temp=34.8), {"temp": 15}, "경고"),       # 저체온 위험 범위 + 실내 저온
+    (None, {"temp": 30}, "주의"),               # 실내 이상만 (확정안: 30℃ 이상)
 ])
 def test_environment_axis(vitals, env, level):
     r = run(vitals, env=env)
@@ -96,7 +97,7 @@ def test_body_temp_danger_gets_hospital():
 
 def test_heating_device_can_be_boiler(monkeypatch):
     monkeypatch.setattr(risk, "HEATING_DEVICE", "boiler")
-    r = evaluate(care("normal", env={"temp": 17}), month=1)
+    r = evaluate(care("normal", env={"temp": 15}), month=1)
     assert r["actions"][0]["value"] == {"device": "boiler", "mode": "heat", "target": 20}
     hot = evaluate(care("normal", env={"temp": 33}), month=8)
     assert hot["actions"][0]["value"]["device"] == "aircon"      # 냉방은 그대로 에어컨
@@ -113,3 +114,10 @@ def test_gait_unsteady_alone_is_caution():
 def test_signs_missing_means_numbers_only():
     """정황 입력이 없으면 지금 시연처럼 수치만으로 판정."""
     assert run(v(spo2=90))["risk_level"] == run(v(spo2=90), {})["risk_level"] == "경고"
+
+
+def test_vital_change_alone_can_raise_when_switched_on(monkeypatch):
+    """확정안 밖의 해든 설계(작은 변화만으로 주의)는 설정값으로 켤 수 있음."""
+    monkeypatch.setattr(risk, "VITAL_CHANGE_ALONE_RAISES", True)
+    assert run(v(hr=95))["risk_level"] == "주의"
+

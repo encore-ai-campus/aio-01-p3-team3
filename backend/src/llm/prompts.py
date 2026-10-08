@@ -23,6 +23,11 @@
 #   ③ 보호자에게 "보호자에게 알렸습니다", 스피커로 말만 걸었는데 "상태 확인 성공·안정적" → 알림은 실행 결과에서 빼고 스피커는 "말을 걸었음(응답 모름)"
 #   ④ 기기 실패인데 어르신께 "시원하게 해 드릴게요" (지키지 못할 약속) → 솔직하게 말하고 직접 하실 일(창문·담요·인덕션 끄기) 안내
 #   ⑤ 거절이면 어르신께 아무 말도 안 감 → "보호자분께 알려 드렸어요, 곧 연락드릴 거예요" (ELDER_MESSAGE_ON_REJECT)
+# 2026-10-08 해든 (워치 버튼): 스피커로 말 걸기 대신 워치에 "괜찮으세요?"를 띄우고 버튼으로 응답 받음 (watch_check, watch_response).
+# 2026-10-08 해든 (현실 상황 2차 점검): ① 조치가 많은 위급 거절(S15)에서 보호자 문장이 120자를 넘어 템플릿으로 감
+#   → 프롬프트에 next_step을 뺀 앞부분 글자 수와 "수치는 2개까지"를 알려 줌.
+#   ② 체온 39.3℃인데 어르신께 열 이야기가 없음(S19) → 체온 원인이면 어르신이 하실 일(ELDER_CARE_TIP)을 넣고 검증.
+# 2026-10-08 해든 (시연 시나리오 확정안): 기기 상태 구조 형식을 "켜짐 120분 300℃"로 프롬프트에 넣고, 그 숫자를 허용 수치에 넣음.
 #
 # 팀원과 겹치는 부분에는 "# [팀 합의] 이름: 설명" 주석을 달았음.
 
@@ -35,7 +40,7 @@ from src.rules.risk import CAUSE_LABEL, VITAL_LABEL
 REASON_MAX = 60          # Emergency 판정 근거
 ACTION_TEXT_MAX = 30     # Emergency 조치 설명 하나
 GUARDIAN_MAX = 120       # Summary 보호자용
-# [팀 합의] 수언 님: 화면·스피커 문장 길이. 어르신 문장이 40 → 60자로 늘어남 (다정한 말투에 한 마디 더). 카드 줄바꿈 확인 부탁.
+# [팀 합의] 수언 님: 화면 문장 길이. 어르신 문장이 40 → 60자로 늘어남 (다정한 말투에 한 마디 더). 카드 줄바꿈 확인 부탁.
 ELDER_MAX = 60           # Summary 어르신용
 
 # 진단명·약·확진 표현. 판단은 "의심" 수준으로만 쓴다 (README 8장).
@@ -58,6 +63,12 @@ ELDER_TIP = {
     "heat": ("난방이 켜지지 않았어요. 옷을 겹쳐 입고 담요를 덮으세요.", ["옷", "담요"]),
     "induction": ("인덕션이 아직 켜져 있어요. 주방에 가시면 꼭 꺼 주세요.", ["꺼"]),
 }
+# 체온 원인일 때 어르신이 하실 일 (알림만 가거나 조치가 끝났을 때). 진단·약 이야기는 하지 않음.
+ELDER_CARE_TIP = {
+    "fever": ("열이 조금 있어요. 물을 자주 드시고 시원하게 누워 쉬세요.", ["물", "쉬"]),
+    "cold_body": ("몸이 차가워요. 담요를 덮고 따뜻한 물을 천천히 드세요.", ["담요", "따뜻"]),
+}
+FEVER_FROM, COLD_BODY_TO = 37.5, 35.9      # 체온 원인일 때 열·저체온 안내를 고르는 기준
 
 
 def next_step(situation: str, level: str, called_119: bool) -> str:
@@ -155,7 +166,7 @@ def build_summary_ctx(emergency_ctx: dict, approved: bool, executed: list[dict] 
     elif not approved:
         situation = "rejected"
     elif not any(a.get("needs_approval") for a in planned):
-        situation = "info"      # 승인할 조치가 없었음 (알림·스피커 확인만)
+        situation = "info"      # 승인할 조치가 없었음 (알림·워치 확인만)
     else:
         situation = "done"
     tip = None
@@ -165,6 +176,13 @@ def build_summary_ctx(emergency_ctx: dict, approved: bool, executed: list[dict] 
                 key = "induction" if v.get("device") == "induction" else v.get("mode", "cool")
                 tip = ELDER_TIP.get(key)
                 break
+    care = None
+    temp = (emergency_ctx.get("vitals") or {}).get("temp")
+    # 119·기기 제어를 한 경우는 그 안내(움직이지 마세요, 에어컨 켰어요)가 우선이라 넣지 않음
+    acted = any(e["action"] in ("call_119", "control_device") for e, _ in ok)
+    if situation in ("info", "done") and not acted and temp is not None and \
+            any(c.startswith("BODY_TEMP") for c in emergency_ctx.get("reason_codes", [])):
+        care = ELDER_CARE_TIP["fever"] if temp >= FEVER_FROM else ELDER_CARE_TIP["cold_body"] if temp <= COLD_BODY_TO else None
     return {
         "situation": situation,
         "auto_reason": "GUARDIAN_TIMEOUT" if situation == "timeout_119" else
@@ -175,6 +193,7 @@ def build_summary_ctx(emergency_ctx: dict, approved: bool, executed: list[dict] 
         "reason_codes": emergency_ctx.get("reason_codes", []),
         "next_step": next_step(situation, emergency_ctx["risk_level"], called and not failed),
         "elder_tip": tip,
+        "elder_care": care,
         "succeeded_types": [e["action"] for e, _ in ok],
         "succeeded_labels": [l for _, l in ok],
         "failed_labels": failed,
@@ -187,8 +206,8 @@ def build_summary_ctx(emergency_ctx: dict, approved: bool, executed: list[dict] 
 def _executed_text(e: dict, label: str) -> str:
     if e.get("result") != "success":
         return f"{label}: 실패"
-    if e["action"] == "speaker_check":     # 말을 건 것이지 어르신이 괜찮다는 뜻이 아님
-        return "스피커로 말 걸기: 했음 (어르신 응답은 아직 모름)"
+    if e["action"] == "watch_check":     # 말을 건 것이지 어르신이 괜찮다는 뜻이 아님
+        return "워치로 괜찮은지 묻기: 했음 (어르신 응답은 아직 모름)"
     return f"{label}: 성공"
 
 
@@ -217,10 +236,21 @@ def _approval_tag(a: dict) -> str:
     return "승인 필요"
 
 
+def _device_text(value) -> str:
+    """{"state": "on", "minutes": 120, "temperature": 300} → "켜짐 120분 300℃". 예전 문자열은 그대로."""
+    if not isinstance(value, dict):
+        return str(value)
+    text = {"on": "켜짐", "off": "꺼짐"}.get(value.get("state"), "상태 모름")
+    if value.get("state") == "on":
+        text += f" {value['minutes']}분" if value.get("minutes") else ""
+        text += f" {value['temperature']}℃" if value.get("temperature") else ""
+    return text
+
+
 def emergency_prompt(ctx: dict, errors: list[str] | None = None) -> str:
     """첫 호출은 errors=None, 재요청은 직전 validate_emergency의 오류 목록을 넘긴다."""
     causes = ", ".join(CAUSE_LABEL[c] for c in ctx["reason_codes"]) or "없음"
-    devices = ", ".join(f"{DEVICE_LABEL.get(k, k)} {v}" for k, v in ctx["devices"].items()) or "정보 없음"
+    devices = ", ".join(f"{DEVICE_LABEL.get(k, k)} {_device_text(v)}" for k, v in ctx["devices"].items()) or "정보 없음"
     actions = "\n".join(f"{i}. {action_label(a)} [{_approval_tag(a)}]" for i, a in enumerate(ctx["actions"], 1))
     prompt = f"""너는 떨어져 사는 보호자에게 어르신 상황을 설명하는 도우미다.
 위험도와 조치 목록은 이미 정해졌다. 바꾸거나 더하거나 빼지 않는다.
@@ -243,7 +273,7 @@ CCTV: {ctx["cctv_description"] or "영상 판단 불가"}
   [승인 없음] 조치에는 "승인", "동의"를 쓰지 않는다. 무엇을 하는지만 쓴다.
 - 진단명, 약, 확진 표현("쓰러졌다")을 쓰지 않는다. CCTV 내용은 "~로 보입니다", "의심"으로 쓴다.
 - 골절, 뇌진탕, 의식 상태처럼 사진으로 알 수 없는 것은 추측하지 않는다. "CCTV에서 바닥에 누운 모습이 보여 낙상이 의심됩니다"처럼 관찰 사실만 쓴다.
-  판정 원인에 "음성 호출 무응답"이 없으면 "무응답"이라고 쓰지 않는다.
+  판정 원인에 "워치 확인 무응답"이 없으면 "무응답"이라고 쓰지 않는다.
 {TONE_RULE}
 - JSON으로만 답한다: {{"reason": "...", "action_texts": ["..."]}}"""
     return prompt + (JSON_FIX.format(errors="; ".join(errors)) if errors else "")
@@ -251,12 +281,12 @@ CCTV: {ctx["cctv_description"] or "영상 판단 불가"}
 
 SITUATION_TEXT = {"done": "보호자가 승인했고 조치를 실행함", "device_fail": "보호자가 승인했지만 일부 조치가 실패함",
                   "rejected": "보호자가 조치를 거절함",
-                  "info": "승인이 필요한 조치는 없었고, 보호자 알림·스피커 확인만 함",
+                  "info": "승인이 필요한 조치는 없었고, 보호자 알림·워치 확인만 함",
                   "auto_119": "보호자 승인을 기다리지 않고 119에 바로 연락함",
                   "timeout_119": "보호자가 정해진 시간 안에 응답하지 않아 119에 자동으로 연락함"}
-AUTO_WHY_TEXT = {"ELDER_NO_RESPONSE": "어르신이 스피커 확인에 응답하지 않음",
+AUTO_WHY_TEXT = {"ELDER_NO_RESPONSE": "어르신이 워치 확인에 응답하지 않음",
                  "VITAL_SEVERE": "바이탈 여러 항목이 매우 위험함", "GUARDIAN_TIMEOUT": "보호자 응답 없음"}
-# 어르신께 겁을 주는 말 (스피커로 혼자 듣는 분)
+# 어르신께 겁을 주는 말 (혼자 계신 분)
 ELDER_FEAR_WORDS = ["위험", "위급", "쓰러", "낙상", "사고", "응급"]
 # 119에 연락했을 때 어르신께 꼭 줄 지시
 ELDER_STAY_WORDS = ["움직이지", "그대로 계세요", "기다려"]
@@ -281,14 +311,15 @@ def summary_prompt(ctx: dict, errors: list[str] | None = None) -> str:
 [규칙]
 - guardian_message: {GUARDIAN_MAX}자 이내. 떨어져 사는 보호자에게 보내는 글이다. 무슨 일인지와 한 일을 쓰고,
   마지막 문장은 반드시 이 문장을 그대로 쓴다: "{ctx["next_step"]}"
+  그 앞부분은 {GUARDIAN_MAX - len(ctx["next_step"]) - 1}자 이내로 쓴다. 수치는 가장 중요한 것 2개까지만 쓴다.
   실패한 조치는 "실패"라고 쓰고 "직접 조치가 필요합니다"를 넣는다. 성공하지 않은 조치를 완료라고 쓰지 않는다.
   실행 결과에 없는 일(구급차 이송, 병원 이동·도착, 진료)과 추측("안정적", "병원으로 가세요")을 쓰지 않는다. 119는 "연락했습니다"까지만 쓴다.
   "보호자에게 알렸습니다"처럼 보호자 자신에게 알렸다는 말을 쓰지 않는다.
-  스피커는 "말을 걸었다"까지만 쓴다. 어르신이 괜찮은지는 아직 모른다.
+  워치는 "괜찮은지 물었다"까지만 쓴다. 어르신이 괜찮은지는 아직 모른다.
   CCTV 내용은 "~로 보입니다"로 쓰고 "확인했다"고 쓰지 않는다.
-  판정 근거에 음성 무응답이 없으면 "무응답"이라고 쓰지 않는다.
+  판정 근거에 워치 무응답이 없으면 "무응답"이라고 쓰지 않는다.
   거절이면 "보호자 거절"로 조치하지 않았다고 쓴다. 거절을 "시도", "실패"로 쓰지 않는다.
-  승인할 조치가 없었으면(알림·스피커 확인만) "승인"이라는 말을 쓰지 않는다.
+  승인할 조치가 없었으면(알림·워치 확인만) "승인"이라는 말을 쓰지 않는다.
   119에 바로·자동으로 연락했으면 그 이유(어르신 응답 없음 등)를 쓰고 "119에 연락했습니다"를 넣는다. 보호자가 승인한 것처럼 쓰지 않는다.
 {TONE_RULE}
 {elder_rule}
@@ -300,7 +331,7 @@ def summary_prompt(ctx: dict, errors: list[str] | None = None) -> str:
 def _elder_rule(ctx: dict) -> str:
     if ctx["situation"] == "rejected" and not ELDER_MESSAGE_ON_REJECT:
         return '- elder_message: 빈 문자열 "" (거절이라 어르신께 보내지 않는다).'
-    common = f"""- elder_message: {ELDER_MAX}자 이내. 혼자 계신 어르신이 스피커로 듣는다.
+    common = f"""- elder_message: {ELDER_MAX}자 이내. 혼자 계신 어르신이 듣거나 읽는다.
   다정한 간호사가 챙기듯 "어르신,"으로 시작하고 부드러운 존댓말로 쓴다.
   수치·CCTV·영상·병명과 "위험", "위급", "쓰러", "낙상", "사고", "응급"을 쓰지 않는다."""
     if ctx["situation"] == "rejected":
@@ -315,6 +346,9 @@ def _elder_rule(ctx: dict) -> str:
         return common + f"""
   기기가 켜지거나 꺼지지 않았다. 된 것처럼 쓰거나 "~해 드릴게요"처럼 약속하지 않는다. 솔직하게 말하고 이렇게 하시라고 안내한다:
   "{ctx["elder_tip"][0]}\""""
+    if ctx.get("elder_care"):
+        return common + f"""
+  지금 하실 일로 이 내용을 다정하게 안내한다: "{ctx["elder_care"][0]}\""""
     return common + """
   한 일과 지금 하실 일 하나를 쓴다. 예: "어르신, 시원하게 에어컨을 켜 두었어요. 물 한 잔 천천히 드세요.\""""
 
@@ -340,6 +374,9 @@ def _allowed_numbers(ctx: dict) -> set[float]:
     nums = [v for v in ctx.get("vitals", {}).values() if v is not None]
     if ctx.get("env_temp") is not None:
         nums.append(ctx["env_temp"])
+    for d in (ctx.get("devices") or {}).values():      # 인덕션 120분·300℃ 같은 기기 값
+        if isinstance(d, dict):
+            nums += [d[k] for k in ("minutes", "temperature") if isinstance(d.get(k), (int, float))]
     for a in ctx.get("actions", []):
         if isinstance(a.get("value"), dict) and a["value"].get("target") is not None:
             nums.append(a["value"]["target"])
@@ -348,11 +385,11 @@ def _allowed_numbers(ctx: dict) -> set[float]:
 
 
 def _no_response_errors(text: str, codes: list[str], auto_reason: str | None = None) -> list[str]:
-    """음성 무응답이 판정에 없는데 "무응답"이라고 쓰면 오류 (보호자 무응답 문장은 제외)."""
-    if "VOICE_NO_RESPONSE" in codes or auto_reason == "ELDER_NO_RESPONSE":
+    """워치 무응답이 판정에 없는데 "무응답"이라고 쓰면 오류 (보호자 무응답 문장은 제외)."""
+    if "WATCH_NO_RESPONSE" in codes or auto_reason == "ELDER_NO_RESPONSE":
         return []
     found = [w for w in NO_RESPONSE_WORDS if w in text.replace("보호자 응답", "")]
-    return [f"어르신 음성 무응답이 판정에 없는데 씀: {found}"] if found else []
+    return [f"어르신 워치 무응답이 판정에 없는데 씀: {found}"] if found else []
 
 
 def _content_errors(text: str, allowed: set[float]) -> list[str]:
@@ -424,6 +461,8 @@ def validate_summary(raw: str, ctx: dict) -> tuple[dict | None, list[str]]:
                 errors.append(f"기기 제어가 실패했는데 어르신께 된 것처럼·약속처럼 씀: {promise}")
             if not any(w in elder for w in ctx["elder_tip"][1]):
                 errors.append(f'기기 제어가 실패했으면 어르신이 하실 일을 안내: "{ctx["elder_tip"][0]}"')
+        if ctx.get("elder_care") and not any(w in elder for w in ctx["elder_care"][1]):
+            errors.append(f'체온 원인이면 어르신이 하실 일을 안내: "{ctx["elder_care"][0]}"')
     if ctx.get("next_step") and ctx["next_step"] not in guardian:
         errors.append(f'guardian_message 마지막에 "{ctx["next_step"]}"를 그대로 넣어야 함')
     for words, what in ((GUARDIAN_SELF_WORDS, "보호자 자신에게 알렸다는 말"), (GUARDIAN_GUESS_WORDS, "확인 안 된 추측")):

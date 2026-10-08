@@ -6,6 +6,9 @@
 #   - analyze_cctv_or_unavailable(): 2회 재시도 뒤 "영상 판단 불가" (README DR-VISION-01). 상옥 님 재시도가 붙기 전 임시.
 #   - 보정: posture가 fallen이면 fall_suspected를 true로 [D2], 사람이 안 보이면 posture none.
 #   - 위험도는 여기서 정하지 않음. backend rules/risk.py의 낙상 축이 이 결과로 판정함.
+# 2026-10-08 해든 (CCTV 판단 방식 변경): LLM이 낙상을 직접 판단하면 소파 앞 바닥·어두운 사진에서 자주 틀려서,
+#   LLM은 보이는 사실 4개(person_visible, body_support, body_shape, image_clear)만 답하고
+#   facts_to_result()가 표(FACT_RULES)로 posture·fall_suspected·confidence를 정한다. 출력 키는 예전과 같고 facts가 더 붙음.
 #
 # [팀 합의] 두나 님: tools/cctv.py의 analyze_cctv(image_path)에서 analyze_cctv_or_unavailable(image_path)를 부르면 됨.
 #   mcp_server/requirements/runtime.txt에 openai(또는 google-genai)와 pillow, config/.env.example에 OPENAI_API_KEY 추가가 필요.
@@ -19,7 +22,7 @@ import re
 from pathlib import Path
 from typing import Callable
 
-from src.vision.prompt import CCTV_SCHEMA, DESCRIPTION_MAX, POSTURES, cctv_prompt
+from src.vision.prompt import CCTV_SCHEMA, DESCRIPTION_MAX, SHAPES, SUPPORTS, cctv_prompt
 
 VisionLLM = Callable[[str, str], str]    # (프롬프트, 이미지 data URL) → 응답 문자열
 
@@ -108,10 +111,41 @@ def _gemini_vision(model: str, client) -> VisionLLM:
     return llm
 
 
-# ---------- 검증·보정 ----------
+# ---------- 사실 → 자세·낙상 의심 (코드 규칙) ----------
+
+# (몸 모양, 몸이 닿은 곳) → (posture, fall_suspected). 모르는 칸은 보수적으로(낙상 쪽으로) 본다.
+#   확정안 4-2: fall.jpg → fallen/true, lying.jpg(소파에 누움) → lying/false, normal.jpg(소파에 앉음) → sitting/false.
+FACT_RULES = {
+    ("upright", "floor"): ("standing", False),
+    ("upright", "furniture"): ("standing", False),
+    ("upright", "unclear"): ("standing", False),
+    ("seated", "furniture"): ("sitting", False),
+    ("seated", "floor"): ("sitting", True),          # 바닥에 주저앉음: 혼자 못 일어나는 상황일 수 있음
+    ("seated", "unclear"): ("sitting", False),
+    ("horizontal", "furniture"): ("lying", False),   # 소파·침대에 누움 (잠 포함)
+    ("horizontal", "floor"): ("fallen", True),
+    ("horizontal", "unclear"): ("fallen", True),     # 바닥인지 모르면 낙상 쪽으로
+    ("unclear", "floor"): ("fallen", True),
+    ("unclear", "furniture"): ("sitting", False),
+    ("unclear", "unclear"): ("fallen", True),        # 사람은 보이는데 아무것도 모르겠음 → 보호자가 사진으로 확인
+}
+
+
+def facts_to_result(facts: dict) -> dict:
+    """LLM이 본 사실 → README cctv 형식 (person_visible, posture, fall_suspected, confidence)."""
+    visible, support, shape = facts["person_visible"], facts["body_support"], facts["body_shape"]
+    if not visible or shape == "none" or support == "none":
+        return {"person_visible": False, "posture": "none", "fall_suspected": False,
+                "confidence": "high" if facts["image_clear"] else "low"}
+    posture, fall = FACT_RULES[(shape, support)]
+    sure = facts["image_clear"] and "unclear" not in (shape, support)
+    return {"person_visible": True, "posture": posture, "fall_suspected": fall, "confidence": "high" if sure else "low"}
+
+
+# ---------- 검증 ----------
 
 def validate_cctv(raw: str) -> tuple[dict | None, list[str]]:
-    """(보정된 결과 또는 None, 오류 목록). 보정: [D2] fallen → fall_suspected true, 사람 없음 → posture none."""
+    """(README cctv 형식 결과 + facts, 오류 목록)."""
     text = (raw or "").strip()
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text)
@@ -123,13 +157,16 @@ def validate_cctv(raw: str) -> tuple[dict | None, list[str]]:
         return None, ["JSON 객체가 아님"]
 
     errors = []
-    for key, kind in (("person_visible", bool), ("fall_suspected", bool), ("posture", str), ("description", str)):
+    for key, kind in (("person_visible", bool), ("image_clear", bool), ("body_support", str),
+                      ("body_shape", str), ("description", str)):
         if not isinstance(data.get(key), kind):
             errors.append(f"{key} 누락 또는 자료형 오류({kind.__name__})")
     if errors:
         return None, errors
-    if data["posture"] not in POSTURES:
-        errors.append(f"posture는 {POSTURES} 중 하나여야 함 (현재 {data['posture']!r})")
+    if data["body_support"] not in SUPPORTS:
+        errors.append(f"body_support는 {SUPPORTS} 중 하나여야 함 (현재 {data['body_support']!r})")
+    if data["body_shape"] not in SHAPES:
+        errors.append(f"body_shape는 {SHAPES} 중 하나여야 함 (현재 {data['body_shape']!r})")
     desc = data["description"].strip()
     if not desc or len(desc) > DESCRIPTION_MAX:
         errors.append(f"description은 1~{DESCRIPTION_MAX}자여야 함 (현재 {len(desc)}자)")
@@ -141,20 +178,8 @@ def validate_cctv(raw: str) -> tuple[dict | None, list[str]]:
     if errors:
         return None, errors
 
-    out = {
-        "person_visible": data["person_visible"],
-        "posture": data["posture"],
-        "fall_suspected": data["fall_suspected"],
-        "confidence": data.get("confidence") if data.get("confidence") in ("high", "low") else "high",
-        "description": desc,
-    }
-    if not out["person_visible"]:            # 사람이 안 보이면 자세도 낙상도 없음
-        out["posture"], out["fall_suspected"] = "none", False
-    elif out["posture"] == "none":           # 사람이 보인다는데 자세가 none → 모순이라 확신 낮춤
-        out["confidence"] = "low"
-    if out["posture"] == "fallen":           # [D2] 보수적으로 낙상 의심으로 고침
-        out["fall_suspected"] = True
-    return out, []
+    facts = {k: data[k] for k in ("person_visible", "body_support", "body_shape", "image_clear")}
+    return {**facts_to_result(facts), "description": desc, "facts": facts}, []
 
 
 # ---------- 분석 ----------

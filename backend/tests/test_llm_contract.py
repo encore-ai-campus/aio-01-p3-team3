@@ -9,6 +9,8 @@
 #   - 2026-10-08 해든 (승인·119 흐름): 119 조치 표시가 "[승인 필요, 60초 응답 없으면 자동 연결]"로 바뀜.
 # 2026-10-08 해든 (4단계): fall 조치가 4개(스피커 확인 추가)로 바뀐 것을 반영.
 # 2026-10-08 해든 (실제 호출 점검): 실제 gpt-4.1-mini 답에서 나온 문구 3종을 그대로 넣어 걸러지는지 확인.
+# 2026-10-08 해든 (워치 버튼·2차 점검): 이름을 워치로 바꾸고, S19 열 안내(ELDER_CARE_TIP)·S15 글자 수 안내·거절 템플릿 판정 근거 테스트 추가.
+# 2026-10-08 해든 (확정안과 다른 부분 정리): 시연 설정에서 워치 확인을 꺼서 fall 조치가 확정안대로 3개(119·응급실·알림).
 
 import json
 
@@ -59,7 +61,7 @@ def test_action_label(action, label):
 def test_emergency_prompt_has_inputs_and_count():
     p = emergency_prompt(emergency_ctx("fall"))
     assert "위급" in p and "심박 118회/분" in p and "119 호출" in p and HOSPITAL in p
-    assert "같은 개수(4개)" in p
+    assert "같은 개수(3개)" in p
     assert "[교정 요청]" not in p
 
 
@@ -86,8 +88,8 @@ def test_rejected_summary_prompt_asks_short_elder_message():
 
 def test_good_emergency_output_passes():
     ctx = emergency_ctx("fall")
-    raw = as_raw({"reason": "쓰러짐이 의심되고 심박 118회/분, 산소포화도 93%입니다.",
-                  "action_texts": ["119에 연락해 구조 요청", "스피커로 상태 확인", "○○병원 응급실 1.2km 안내", "보호자께 상황 알림"]})
+    raw = as_raw({"reason": "쓰러짐이 의심되고 심박 118회/분, 산소포화도 95%입니다.",
+                  "action_texts": ["119에 연락해 구조 요청", "○○병원 응급실 1.2km 안내", "보호자께 상황 알림"]})
     data, errors = validate_emergency(raw, ctx)
     assert errors == [] and data is not None
 
@@ -104,7 +106,7 @@ def test_emergency_code_block_is_accepted():
     ({"reason": "어르신이 쓰러졌습니다.", "action_texts": ["119", "병원", "알림"]}, "확진 표현"),
     ({"reason": "뇌졸중이 의심됩니다.", "action_texts": ["119", "병원", "알림"]}, "진단·약"),
     ({"reason": "쓰러짐 의심입니다.", "action_texts": ["119", "알림"]}, "조치 개수"),
-    ({"reason": "쓰러짐 의심입니다.", "action_texts": ["119", "스피커", "병원", "알림", "에어컨 켜기"]}, "조치 개수"),
+    ({"reason": "쓰러짐 의심입니다.", "action_texts": ["119", "워치", "병원", "알림", "에어컨 켜기"]}, "조치 개수"),
     ({"reason": "가" * 61, "action_texts": ["119", "병원", "알림"]}, "reason은"),
     ({"reason": "쓰러짐 의심", "action_texts": ["119", "가" * 31, "알림"]}, "조치 설명"),
     ({"reason": "쓰러짐 의심"}, "action_texts 누락"),
@@ -121,7 +123,7 @@ def test_not_json_caught():
 
 def test_rounded_number_is_allowed():
     ctx = emergency_ctx("heat")   # 실내 33℃, 심박 105
-    raw = as_raw({"reason": "실내 33도 고온에 심박 105회입니다.", "action_texts": ["에어컨 냉방 26도", "보호자께 알림"]})
+    raw = as_raw({"reason": "실내 33도 고온에 심박 105회입니다.", "action_texts": ["에어컨 냉방 26도", "가까운 병원 안내", "보호자께 알림"]})
     assert validate_emergency(raw, ctx)[1] == []
 
 
@@ -216,7 +218,8 @@ def test_summary_fallback_texts():
     out = fallback_summary(build_summary_ctx(e, True, DEVICE_FAIL))
     assert out["guardian_message"].startswith("에어컨 켜기에 실패했습니다. 직접 조치가 필요합니다.")
     out = fallback_summary(build_summary_ctx(e, False, []))
-    assert out == {"guardian_message": "보호자 거절로 조치 없이 기록했습니다. 위험도 위급. 지금 바로 어르신께 직접 연락해 상태를 확인하세요.",
+    assert out == {"guardian_message": "CCTV 쓰러짐 의심 + 심박·혈압 위험 범위 + 산소포화도 변화. 보호자 거절로 조치 없이 기록했습니다. "
+                                       "위험도 위급. 지금 바로 어르신께 직접 연락해 상태를 확인하세요.",
                    "elder_message": "어르신, 보호자분께 상황을 알려 드렸어요. 곧 연락드릴 거예요."}
 
 
@@ -231,7 +234,7 @@ def test_pending_message():
 def test_no_approval_action_cannot_say_approve():
     ctx = emergency_ctx("fall")
     raw = as_raw({"reason": "쓰러짐이 의심됩니다.",
-                  "action_texts": ["119 호출 승인", "스피커로 상태 확인 시도 승인", "응급실 정보 안내", "보호자에게 즉시 상황 알림 동의"]})
+                  "action_texts": ["119 호출 승인", "응급실 정보 안내 승인", "보호자에게 즉시 상황 알림 동의"]})
     data, errors = validate_emergency(raw, ctx)
     assert data is None
     assert sum("승인·동의" in e for e in errors) == 2     # 119는 승인 필요라 괜찮음
@@ -239,12 +242,12 @@ def test_no_approval_action_cannot_say_approve():
 
 def test_prompt_marks_approval_per_action():
     p = emergency_prompt(emergency_ctx("fall"))
-    assert "1. 119 호출 [승인 필요, 60초 응답 없으면 자동 연결]" in p and "2. 스피커로 상태 확인 [승인 없음, 바로 실행]" in p
+    assert "1. 119 호출 [승인 필요, 60초 응답 없으면 자동 연결]" in p and "2. 가까운 병원 정보 안내 [승인 없음, 바로 실행]" in p
 
 
 @pytest.mark.parametrize("guardian, elder", [
     ("보호자 승인하에 119 호출을 완료했습니다. 환자분은 ○○병원 응급실로 이송 중입니다.", "지금 병원으로 안전하게 이동 중입니다."),
-    ("119 호출과 스피커 확인을 마쳤습니다. 응급실로 이송 준비를 계속 진행하겠습니다.", "괜찮으신지 계속 확인할게요."),
+    ("119 호출과 워치 확인을 마쳤습니다. 응급실로 이송 준비를 계속 진행하겠습니다.", "괜찮으신지 계속 확인할게요."),
 ])
 def test_summary_cannot_claim_undone_things(guardian, elder):
     s = build_summary_ctx(emergency_ctx("critical"), True, DONE_119)
@@ -289,7 +292,7 @@ ELDER_OK_119 = "어르신, 구급대가 오고 있어요. 움직이지 말고 �
     (f"승인하신 대로 119에 연락했습니다. 지금 바로 병원으로 이동 준비하세요.", "그대로 넣어야"),                # S01
     (f"119에 연락했습니다. 병원으로 이동 준비하세요. {NEXT_119}", "추측"),
     (f"119에 연락했고 보호자님께 상황을 알렸습니다. {NEXT_119}", "보호자 자신"),                            # S01
-    (f"낙상 의심과 무응답으로 119에 연락했습니다. {NEXT_119}", "무응답"),                                    # S17 (음성 응답 없음)
+    (f"낙상 의심과 무응답으로 119에 연락했습니다. {NEXT_119}", "무응답"),                                    # S17 (워치 응답 없음)
 ])
 def test_realistic_guardian_problems_caught(guardian, word):
     _, errors = _summary_errors("fall", True, DONE_119, guardian, ELDER_OK_119)
@@ -306,9 +309,9 @@ def test_notify_guardian_is_not_in_executed():
     assert not any("보호자" in x for x in s["executed"])
 
 
-def test_speaker_executed_text_is_not_success_of_elder():
-    s = build_summary_ctx(emergency_ctx("fall"), True, [{"action": "speaker_check", "result": "success"}])
-    assert s["executed"] == ["스피커로 말 걸기: 했음 (어르신 응답은 아직 모름)"]
+def test_watch_executed_text_is_not_success_of_elder():
+    s = build_summary_ctx(emergency_ctx("fall"), True, [{"action": "watch_check", "result": "success"}])
+    assert s["executed"] == ["워치로 괜찮은지 묻기: 했음 (어르신 응답은 아직 모름)"]
 
 
 @pytest.mark.parametrize("elder, word", [
@@ -334,3 +337,40 @@ def test_next_step_by_situation():
     assert next_step("info", "경고", False).startswith("지금 바로")
     assert next_step("info", "주의", False) == "어르신께 안부 전화로 상태를 확인해 주세요."
     assert next_step("rejected", "위급", False).startswith("지금 바로")
+
+
+def test_fever_elder_care_tip():
+    """S19: 체온 39.3℃로 알림만 갔을 때 어르신께 열 이야기와 하실 일이 들어감 (LLM·템플릿 둘 다)."""
+    from src.llm.prompts import ELDER_CARE_TIP
+    ctx = {"risk_level": "주의", "reason_codes": ["BODY_TEMP_CHANGE"], "reason": "체온 39.3℃",
+           "vitals": {"hr": 100, "sbp": 125, "temp": 39.3, "spo2": 97}, "env_temp": 24,
+           "actions": [{"type": "notify_guardian", "needs_approval": False}], "hospital": None}
+    s = build_summary_ctx(ctx, True, [{"action": "notify_guardian", "result": "success"}])
+    assert s["situation"] == "info" and s["elder_care"] == ELDER_CARE_TIP["fever"]
+    out = fallback_summary(s)
+    assert validate_summary(json.dumps(out, ensure_ascii=False), s)[1] == []
+    assert "물" in out["elder_message"]
+    bad = dict(out, elder_message="어르신, 보호자분께 알려 드렸어요. 편히 계세요.")
+    assert any("체온" in e for e in validate_summary(json.dumps(bad, ensure_ascii=False), s)[1])
+    cold = build_summary_ctx(dict(ctx, vitals=dict(ctx["vitals"], temp=35.2)), True, [])
+    assert cold["elder_care"] == ELDER_CARE_TIP["cold_body"]
+
+
+def test_summary_prompt_gives_length_budget():
+    """S15: 조치가 많은 위급 거절에서 120자를 넘지 않게 앞부분 글자 수를 알려 줌."""
+    from src.llm.prompts import GUARDIAN_MAX, summary_prompt
+    ctx = {"risk_level": "위급", "reason_codes": ["FALL_DETECTED"], "reason": "CCTV에 누운 모습",
+           "vitals": {"hr": 112, "sbp": 120, "temp": 38.2, "spo2": 96}, "env_temp": 33,
+           "actions": [{"type": "call_119", "needs_approval": True}], "hospital": None}
+    s = build_summary_ctx(ctx, False, [])
+    assert f"{GUARDIAN_MAX - len(s['next_step']) - 1}자 이내" in summary_prompt(s)
+
+
+def test_structured_device_status_in_prompt_and_numbers():
+    """확정안 기기 형식 {"state", "minutes", "temperature"}: 프롬프트에 "켜짐 120분 300℃", 300℃는 허용 수치."""
+    from tests.test_risk_rules import care
+    from src.agents.emergency import run_emergency
+    em = run_emergency(care("induction", "하"), month=8)
+    assert "인덕션 켜짐 120분 300℃" in emergency_prompt(em["context"])
+    raw = as_raw({"reason": "주방에 사람이 없고 인덕션이 300℃로 켜져 있습니다.", "action_texts": ["인덕션 끄기", "보호자께 알림"]})
+    assert validate_emergency(raw, em["context"])[1] == []
