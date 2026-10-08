@@ -1,0 +1,87 @@
+# 오토힐링 연결 안내 (상옥)
+
+> 과거 초안 보관용입니다. 현재 구현·계약은 docs/autohealing_integration.md를 사용하세요.
+> 원본 소스와 테스트는 .py.txt로 보존하며 실행·시험 대상이 아닙니다.
+
+`src/autohealing.py`는 표준 라이브러리만 사용하는 공통 복구 모듈입니다.
+현재 `/api/weather`는 기존 수업 예제이므로 변경하지 않았습니다.
+팀의 `/alert` 오케스트레이터에서 아래 어댑터를 연결합니다.
+
+```python
+from src.autohealing import AutoHealing, HealingStore, validate_writer, validate_summary
+
+store = HealingStore("data/autohealing.sqlite3")
+healing = AutoHealing(store, retries=3, delay_s=0.5, timeout_s=15)
+
+weather = await healing.tool(
+    task_id=task_id, step="weather", fetch=lambda: get_weather(lat, lon),
+    validate=validate_weather, cache_key=f"weather:{nx}:{ny}:{forecast_date}:{season}",
+    max_age_s=3600, faults=faults,
+)
+writer = await healing.llm(
+    task_id=task_id, step="writer", generate=generate_writer,
+    validate=validate_writer, template=writer_template, faults=faults,
+)
+# Writer/Summary generate(repair: bool)는 해든님이 구현합니다.
+# repair=True이면 JSON 형식 교정 지시를 포함한 프롬프트로 재요청합니다.
+# template()는 기존 코드가 계산한 위험도/근거/실제 쉼터를 채운 dict를 반환합니다.
+```
+
+## 계약
+
+- tool: 최초 1회 + 최대 재시도 3회 (최대 총 4회). 대기는 0.5, 1, 1.5초입니다.
+  지혜님 오케스트레이터는 동일 호출을 중복 재시도하지 않습니다.
+- fetch/fallback/generate/template은 동기 또는 비동기 함수입니다.
+  동기 함수는 별도 스레드에서 실행합니다. timeout 이후 이미 시작한 동기 함수는
+  강제 종료되지 않으므로 실제 HTTP 클라이언트에도 timeout을 설정해야 합니다.
+- validate(data)는 성공 시 반환하고 부적합 시 예외를 던지는 동기 함수입니다.
+  날씨 범위/발표시각/대상 날짜 검사는 팀의 데이터 규격에 맞춰 제공해야 합니다.
+- 반환값: `{"data": ..., "source": "live" | "cache" | "csv" | "template"}`.
+  캐시 반환에는 UTC Unix timestamp인 `saved_at`도 포함됩니다.
+- 날씨 캐시는 같은 격자·예보 대상 날짜·계절끼리만 공유하세요.
+  `max_age_s` 기본값 3600초는 임시 정책이며 팀에서 합의해야 합니다.
+  만료/깨진 JSON/검증 실패 캐시는 사용하지 않습니다.
+- Shelter가 API를 사용하면 `step="shelter", fallback=load_shelter_csv`로 연결합니다.
+  CSV 함수와 validate는 두나님이 제공합니다. 처음부터 CSV라면 직접 조회해도 됩니다.
+- 복구 불가 시 `RecoveryError`. Weather 안전 종료, Shelter 정보 없음 진행은
+  지혜님 Guard가 결정합니다. 캐시 복구 시에도 `source`와 데이터 기준시각을 전달합니다.
+- `faults`는 문자열 목록/집합: `weather`, `shelter`, `llm`, `writer`, `summary`.
+  `llm`은 Writer/Summary 모두에 지속적인 형식 오류를 주입합니다.
+- LLM 최초 요청 + 교정 요청 1회, 이후 단계별 템플릿. Writer는 actions 3개,
+  각 20자 이하와 reason, Summary는 두 메시지와 어르신 메시지 90자 이하를 검사합니다.
+  장소/수치 사실 확인은 별도의 도메인 검증으로 확장하세요.
+- `run_logs`에는 예외 클래스명만 기록하며 원문 응답/프롬프트/프로필/키는 기록하지 않습니다.
+  cache에는 검증된 날씨·쉼터 데이터만 저장하고 프로필/LLM 민감 입력은 넣지 마세요.
+- DB 오류는 숨기지 않고 호출자에게 전달합니다. Docker 사용 시 `data/`를 쓰기 가능한
+  영속 볼륨에 연결하세요. 이 모듈은 DB 경로를 자동 선택하지 않습니다.
+
+## 로그와 지표
+
+`store.logs(task_id)` 결과를 `/logs` 또는 `/alert`의 logs 필드로 전달합니다.
+필드: id, task_id, step, attempt, status, error, recovery, elapsed_ms, created_at.
+상태: success/retry/fallback/fail. fail은 해당 호출의 시도가 소진되었음을 의미하며
+그 뒤 fallback이 있으면 복구 성공입니다. task 최종 결과와 구분해야 합니다.
+
+오케스트레이터 종료 시 **한 번** `store.finish_task(task_id, success=True/False)`를 호출하세요.
+최종 알림 생성이나 정상 no_alert는 True, 안전 실패 종료는 False입니다.
+task_id는 매 실행 고유해야 합니다.
+
+`store.metrics()`:
+
+- auto_recovery_rate: 장애 기록이 있는 완료 task 중 최종 성공 task 비율 (0~1).
+  진행 중 task와 장애 없는 task는 분모에서 제외, 표본이 없으면 None.
+- completed_fault_tasks: 해당 분모.
+- mean_recovery_ms: 첫 호출 시작부터 retry 성공/캐시·CSV·템플릿 복구 완료까지의
+  시간 평균 (호출 단위). 재시도만으로 복구한 경우도 포함하며 표본 없으면 None.
+
+## 단독 검증
+
+```powershell
+cd backend
+python -m pytest tests/test_autohealing.py -q
+```
+
+시험: 정상 후 캐시 복구, 일시 장애 후 재시도 성공, 빈/만료/잘못된 캐시,
+CSV 대체, timeout, LLM 교정/템플릿/잘못된 템플릿, 병렬 task 분리, 복구 지표.
+실제 API 없이 실행합니다. 통합 이후 DR-API-01과 DR-LLM-01을 각 3~5회 실행하고
+task_id, 결과, 복구시간, 수동개입 여부 및 화면 캡처를 복구 보고서에 남기세요.
