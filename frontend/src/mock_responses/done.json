@@ -1,1 +1,15 @@
-{}
+{
+  "run_id": "run-demo-001",
+  "status": "completed",
+  "current_step": "보호자 승인 → 119 호출(Mock) 완료 → 안내 전송",
+  "actions": [
+    {
+      "tool": "call_119",
+      "status": "success",
+      "message": "119 호출을 Mock으로 실행했습니다.",
+      "recovery": null
+    }
+  ],
+  "guardian_message": "승인하신 대로 119 연락 조치를 실행했습니다.",
+  "elder_message": "곧 도움이 도착해요. 움직이지 말고 기다려 주세요."
+}

@@ -1,1 +1,2 @@
 -r runtime.txt
+pytest>=8,<10
