@@ -1,5 +1,6 @@
 """어르신 케어 API와 에이전트 사이에서 사용하는 공통 Pydantic 스키마."""
 
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -51,6 +52,51 @@ class VitalData(BaseModel):
 
     # 측정 시각이 없는 Mock 상황도 허용
     measured_at: str | None = None
+
+
+# ---------- POST /vitals/readings 요청 ----------
+
+class VitalReadingCreate(BaseModel):
+    """15초 주기로 수신하는 어르신 바이탈 측정 데이터."""
+
+    # 필수: 바이탈 데이터가 속한 어르신 ID. 공백 문자열은 허용하지 않음
+    profile_id: str = Field(min_length=1, description="바이탈 데이터가 속한 어르신 ID")
+
+    # 필수: 실제 측정한 심박수(회/분). 0 이하 값은 허용하지 않음
+    heart_rate: int = Field(gt=0, description="실제 측정한 심박수(회/분)")
+
+    # 선택: 측정 장비나 전송 상황에 따라 값이 없을 수 있음
+    systolic_bp: int | None = Field(default=None, title="최고 혈압")
+    diastolic_bp: int | None = Field(default=None, title="최저 혈압")
+    temperature_c: float | None = Field(default=None, description="체온(°C)")
+    spo2: int | None = Field(
+        default=None,
+        ge=0,
+        le=100,
+        description="산소포화도(%). 값이 있는 경우 0~100 범위",
+    )
+
+    # 필수: HTTP 전송 시각이 아니라 심박수를 실제로 측정한 시각
+    measured_at: datetime = Field(
+        description="심박수를 실제로 측정한 시각(전송 시각과 다를 수 있음)",
+    )
+
+    # 선택: 시나리오별 시뮬레이션 데이터 구분용. 생략하면 일반 수집 데이터로 저장
+    scenario: Scenario | None = Field(
+        default=None,
+        description="시나리오별 측정 데이터인 경우 시나리오 이름",
+    )
+
+
+class VitalReadingResponse(BaseModel):
+    """바이탈 데이터 저장 완료 응답."""
+
+    status: Literal["stored"] = Field(
+        default="stored",
+        description="요청한 바이탈 데이터를 저장했음을 나타내는 상태",
+    )
+    profile_id: str = Field(description="저장한 바이탈 데이터가 속한 어르신 ID")
+    measured_at: datetime = Field(description="저장한 바이탈 데이터의 실제 측정 시각")
 
 
 class IndoorEnvironment(BaseModel):
