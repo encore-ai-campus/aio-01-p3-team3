@@ -38,7 +38,7 @@
 | 서비스          | 노인 실시간 케어: 바이탈·실내 환경·CCTV 모니터링, 긴급 조치안 생성, 보호자 승인 후 조치 실행                                                                                                           |
 | **주요 사용자** | **떨어져 사는 노인 보호자** (자녀, 가족, 돌봄 담당자)                                                                                                                                                  |
 | 돌봄 대상       | 혼자 사는 어르신                                                                                                                                                                                       |
-| 핵심 원칙       | ① 기기 제어·119 호출 같은 조치는 **보호자 승인 후에만** 실행한다. ② 장애가 나도 조용히 멈추지 않고, 복구가 안 되면 **보호자에게 직접 알린다**. ③ 정보가 빠지면 더 보수적인 쪽(알리는 쪽)으로 판단한다. |
+| 핵심 원칙       | ① 기기 제어·119 호출 같은 조치는 **보호자 승인 후에만** 실행한다. 단, **바이탈이 매우 위험하면(`VITAL_SEVERE`) 승인 없이 119에 바로 연결**하고 보호자에게 즉시 알린다. ② 장애가 나도 조용히 멈추지 않고, 복구가 안 되면 **보호자에게 직접 알린다**. ③ 정보가 빠지면 더 보수적인 쪽(알리는 쪽)으로 판단한다. |
 
 ### 해결하려는 문제
 
@@ -54,7 +54,7 @@
 
 - 바이탈, 집 안 기기, 프로필은 서로 독립적인 정보라 **병렬로 확인**하면 빠르고, 한쪽 센서가 고장 나도 나머지는 살릴 수 있습니다.
 - **판정(코드 규칙)**과 **조치안·문장 작성(LLM)**을 나눠서, 판단은 일관되고 검증 가능하게, 안내는 읽기 쉽게 만듭니다.
-- 사람의 판단이 필요한 조치는 **승인 단계**로 분리해서, 에이전트가 마음대로 기기를 끄거나 119에 전화하지 않게 합니다.
+- 사람의 판단이 필요한 조치는 **승인 단계**로 분리해서, 에이전트가 마음대로 기기를 끄거나 119에 전화하지 않게 합니다. 예외는 바이탈이 매우 위험해 승인을 기다릴 시간이 없는 경우(119 자동 연결) 하나뿐입니다.
 
 ---
 
@@ -128,6 +128,7 @@
                            │
                   ★ Approval Gate ★
                     (보호자 승인)
+       ※ VITAL_SEVERE면 승인 없이 119 자동 연결 → 보호자 긴급 알림
                   승인 ↙        ↘ 거절
            Action 실행          조치 없이 기록
    (IoT 제어, 알림·119 호출 — mock)
@@ -149,7 +150,7 @@
 | Profile Agent       | SQLite 테스트 프로필 읽기                                                            |
 | Validation, Guard   | 판정 결과를 SQLite 실행 로그에 기록                                                  |
 | Emergency Agent     | 규칙으로 위험도 판정, LLM으로 조치안 문장 생성                                       |
-| Approval Gate       | `status: pending_approval` 반환 → 보호자가 화면에서 승인/거절 → `POST /care/approve` |
+| Approval Gate       | `status: pending_approval` 반환 → 보호자가 화면에서 승인/거절 → `POST /care/approve`. `auto_119`가 있으면 승인 없이 바로 Action 실행 (`decided_by: "auto"`) |
 | Action 실행         | MCP `control_device`, `notify_guardian`, `call_119` (mock)                           |
 | Summary Agent → END | LLM으로 안내문 생성 → Streamlit 결과 카드 표시                                       |
 
@@ -159,11 +160,11 @@
 
 | 에이전트            | 주요 역할                                                                                    | 제한사항                                                             | 주요 출력                                       |
 | ------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ----------------------------------------------- |
-| **Orchestrator**    | 호출 순서·병렬 실행, Guard 판단, 승인 대기 관리, task_id·시도 횟수 관리, 최종 성공·실패 판단 | 도구 직접 호출 금지, 위험도 직접 판정 금지, 승인 없이 조치 실행 금지 | 다음 경로, 실행 상태, `current_step`            |
+| **Orchestrator**    | 호출 순서·병렬 실행, Guard 판단, 승인 대기 관리, run_id·시도 횟수 관리, 최종 성공·실패 판단 | 도구 직접 호출 금지, 위험도 직접 판정 금지, 승인 없이 조치 실행 금지 (`auto_119` 예외) | 다음 경로, 실행 상태, `current_step`            |
 | **Vital Agent**     | 심박, 혈압, 체온, 산소포화도 조회                                                            | 진단 금지, 실패 시 예외를 그대로 던짐                                | 바이탈 수치, 측정 시각                          |
 | **IoT Agent**       | 실내 온습도·기기 상태 조회, CCTV 캡처 이미지 분석, 승인된 기기 제어                          | 승인 없는 기기 제어 금지, 이미지에 보이지 않는 내용 추측 금지        | 실내 환경, 기기 상태, CCTV 분석 결과, 제어 결과 |
 | **Profile Agent**   | 취약도(상/중/하) 계산                                                                        | 질병 진단 금지, 지병명 전달 금지                                     | 취약도                                          |
-| **Emergency Agent** | 규칙표로 위험도 판정(코드), 조치안 작성(LLM), 필요 시 가까운 병원 정보 첨부                  | 위험도를 LLM이 정하지 않음, 입력에 없는 수치·장소 생성 금지          | 위험도, 조치안 목록, 판정 근거                  |
+| **Emergency Agent** | 규칙표로 위험도·축별 단계·낙상 상태·자동 119 여부 판정(코드), 조치안 작성(LLM), 필요 시 가까운 병원 정보 첨부 | 위험도와 조치 종류를 LLM이 정하지 않음, 입력에 없는 수치·장소 생성 금지 | 위험도, 판정 근거, 조치안 목록, `axes`, `fall_state`, `auto_119` |
 | **Summary Agent**   | 보호자용 결과 보고, 어르신용 짧은 안내 작성(LLM)                                             | 질병·약 조언 금지, 어르신용에 CCTV 이미지 포함 금지                  | guardian_message, elder_message                 |
 
 > **원칙: LLM은 판단하지 않고 전달만 한다.** 위험도 판정은 일관되고 검증 가능한 코드 규칙으로 처리하고, LLM은 이미지 설명·조치안 문장·안내문만 만듭니다.
@@ -219,10 +220,13 @@ def vulnerability(p):
 | 항목                  | 내용                                                                       |
 | --------------------- | -------------------------------------------------------------------------- |
 | 승인이 필요한 조치    | 기기 제어(에어컨 켜기, 인덕션 끄기 등), 119 호출                           |
-| 승인 없이 하는 일     | 상태 확인, 위험도 판정, 보호자에게 승인 요청 보내기                        |
+| 승인 없이 하는 일     | 상태 확인, 위험도 판정, 보호자 알림(승인 요청·긴급 알림·정보), 병원 정보 조회 |
+| **119 자동 연결**     | `auto_119: "VITAL_SEVERE"`일 때만. 바이탈 위험 범위(3점) 항목 2개 이상 **그리고** 점수 합 7점 이상 **그리고** 최신 측정값(캐시 아님). 승인 화면 없이 119 → 보호자에게 "연락했습니다" 긴급 알림 |
 | 승인 화면에 보여줄 것 | 위험도, 판정 근거, 조치안 목록, CCTV 캡처 + 한 문장 설명, 가까운 병원 정보 |
-| 승인                  | Action 실행 → Summary → 결과 보고                                          |
+| 승인                  | Action 실행 → Summary → 결과 보고 (`decided_by: "guardian"`)               |
 | 거절                  | 조치 없이 "보호자 거절"로 기록 → Summary(보호자용 기록만)                  |
+
+> 캐시(이전 측정값)일 때는 센서 오류일 수 있어 자동 연결하지 않고 승인 요청으로 돌립니다.
 
 ---
 
@@ -230,75 +234,123 @@ def vulnerability(p):
 
 ### CareStatusResult (Orchestration 1 → 2)
 
+> 형식의 기준은 `backend/src/schemas.py`(지혜)입니다. 아래는 `fall` 시나리오 예시입니다.
+
 ```json
 {
-  "task_id": "task-102",
-  "attempt": 1,
+  "run_id": "run-102",
+  "profile_id": "profile-01",
   "scenario": "fall",
-  "vitals": { "hr": 118, "sbp": 120, "temp": 36.4, "spo2": 95, "measured_at": "10:42", "source": "live" },
-  "env": { "temp": 25, "humidity": 50 },
+  "attempt": 1,
+  "vital": {
+    "heart_rate": 118,
+    "systolic_bp": 120,
+    "temperature_c": 36.4,
+    "spo2": 96,
+    "measured_at": "10:42"
+  },
+  "indoor_environment": { "temperature_c": 25, "humidity_percent": 50 },
   "devices": {
-    "aircon": { "state": "off" },
-    "induction": { "state": "off", "minutes": 0, "temperature": 0 }
+    "air_conditioner": "off",
+    "induction": "off",
+    "induction_minutes": null,
+    "induction_temperature": null
   },
   "cctv": {
     "image_path": "assets/cctv/fall.jpg",
     "person_visible": true,
     "posture": "fallen",
     "fall_suspected": true,
-    "description": "거실 바닥에 사람이 쓰러져 있는 것으로 보입니다."
+    "confidence": 0.9,
+    "description": "거실 바닥에 사람이 쓰러져 있는 것으로 보입니다.",
+    "status": "analyzed"
   },
   "vulnerability": "상",
+  "area": "서울 ○○구",
+  "source": "live",
   "errors": []
 }
 ```
 > 지병명 원문은 넘기지 않고 `vulnerability`만, CCTV는 이미지 자체가 아니라 **파일 경로와 분석 결과만** 전달합니다.
+> `source`: `live`(실시간) / `cache`(이전 측정값) / `mock` / `mixed`. CCTV `status`: `analyzed` / `unavailable` / `failed`.
 
 ### EmergencyResult (Emergency Agent → Approval Gate)
 
 ```json
 {
+  "run_id": "run-102",
   "risk_level": "위급",
-  "reason": "CCTV 쓰러짐 의심 + 심박 상승",
-  "actions": [
-    { "type": "notify_guardian", "needs_approval": false },
-    { "type": "call_119", "needs_approval": true },
-    { "type": "hospital_info", "value": "○○병원 응급실 (1.2km)" }
-  ]
+  "reasons": ["CCTV 쓰러짐 의심", "심박·혈압 변화"],
+  "axes": { "fall": "위급", "cardio": "주의", "respiratory": "정상", "environment": "정상" },
+  "fall_state": "confirmed",
+  "auto_119": null,
+  "proposed_actions": [
+    { "tool": "call_119", "description": "119에 연락합니다", "arguments": { "message": "거실 쓰러짐 의심" }, "needs_approval": true },
+    { "tool": "find_hospital", "description": "가까운 응급실: ○○병원 (1.2km)", "arguments": { "area": "서울 ○○구" }, "needs_approval": false },
+    { "tool": "notify_guardian", "description": "보호자에게 승인 요청", "arguments": { "message": "승인이 필요합니다" }, "needs_approval": false }
+  ],
+  "requires_approval": true,
+  "cctv_summary": "거실 바닥에 사람이 쓰러져 있는 것으로 보입니다."
 }
 ```
+- `axes`: 판정 축 4개(`fall` 낙상 / `cardio` 심뇌 / `respiratory` 호흡 / `environment` 환경)별 단계. 최종 위험도는 가장 높은 축 + 취약도 보정 (9장)
+- `fall_state`: `none` / `false_alarm`(오탐 가능) / `suspected`(의심) / `confirmed`(확인) / `critical`(위급)
+- `auto_119`: `"VITAL_SEVERE"`면 승인 없이 119 자동 연결, 아니면 `null`
 
 ### 응답 1: 승인 대기 (`POST /care/run`)
 
 ```json
 {
-  "task_id": "task-102",
+  "run_id": "run-102",
   "status": "pending_approval",
   "current_step": "바이탈 확인 → IoT·CCTV 확인 → 위험 판정 완료 → 보호자 승인 대기",
-  "risk_level": "위급",
-  "reason": "CCTV 쓰러짐 의심 + 심박 상승",
-  "actions": ["119 호출", "○○병원 응급실 정보 안내"],
-  "cctv": { "image_path": "assets/cctv/fall.jpg", "description": "거실 바닥에 사람이 쓰러져 있는 것으로 보입니다." },
-  "logs": []
+  "care_status": { "...": "위 CareStatusResult" },
+  "emergency": { "...": "위 EmergencyResult" },
+  "message": null,
+  "approved": null,
+  "decided_by": null
 }
 ```
 
 ### 응답 2: 최종 결과 (`POST /care/approve`)
 
+요청: `{ "run_id": "run-102", "decision": "approve" }` (거절은 `"reject"`)
+
 ```json
 {
-  "task_id": "task-102",
+  "run_id": "run-102",
   "status": "done",
-  "approved": true,
   "current_step": "보호자 승인 → 119 호출(mock) 완료 → 안내 전송",
-  "risk_level": "위급",
-  "executed": [{ "action": "call_119", "result": "success" }],
+  "actions": [
+    { "tool": "call_119", "status": "success", "message": "119 호출(mock) 완료", "recovery": null },
+    { "tool": "notify_guardian", "status": "success", "message": "보호자 알림 전송", "recovery": null }
+  ],
   "guardian_message": "어르신 댁 거실에서 쓰러짐이 의심되어 승인하신 대로 119에 연락했습니다. 가까운 응급실: ○○병원(1.2km).",
   "elder_message": "곧 도움이 도착해요. 움직이지 말고 기다려 주세요.",
-  "logs": [{ "step": "vision", "attempt": 1, "status": "success" }]
+  "approved": true,
+  "decided_by": "guardian"
 }
 ```
-`status`: `no_issue` / `pending_approval` / `done` / `rejected` / `fail`
+
+### 응답 3: 119 자동 연결 (`POST /care/run`, `critical` 시나리오)
+
+`auto_119`가 있으면 승인 대기 없이 `/care/run` 한 번에 최종 결과까지 돌려줍니다.
+
+```json
+{
+  "run_id": "run-105",
+  "status": "done",
+  "current_step": "바이탈 확인 → 위험 판정(바이탈 매우 위험) → 119 자동 연결(mock) → 보호자 긴급 알림",
+  "care_status": { "...": "CareStatusResult" },
+  "emergency": { "risk_level": "위급", "auto_119": "VITAL_SEVERE", "requires_approval": false, "...": "" },
+  "message": "바이탈 여러 항목이 매우 위험해 보호자 승인 없이 119에 연락했습니다.",
+  "approved": null,
+  "decided_by": "auto"
+}
+```
+- `status`: `no_issue` / `pending_approval` / `done` / `rejected` / `fail`
+- `decided_by`: `guardian`(보호자 결정) / `auto`(119 자동 연결)
+- `ActionResult.status`: `success` / `failed` / `skipped`
 
 ---
 
@@ -318,7 +370,7 @@ DR-IOT-01은 **"끝까지 복구가 안 되면 사람에게 넘긴다"**를 보�
 ### 재시도 + 캐시 폴백
 
 ```python
-def with_healing(cache_key, fetch, task_id, step, fault=None, retries=3, use_cache=True):
+def with_healing(cache_key, fetch, run_id, step, fault=None, retries=3, use_cache=True):
     start = time.time()
     for attempt in range(1, retries + 1):
         try:
@@ -327,18 +379,18 @@ def with_healing(cache_key, fetch, task_id, step, fault=None, retries=3, use_cac
             result = fetch()
             if use_cache:
                 save_cache(cache_key, result)
-            log(task_id, step, attempt, "success", elapsed_ms=elapsed(start))
+            log(run_id, step, attempt, "success", elapsed_ms=elapsed(start))
             return {"data": result, "source": "live"}
         except Exception as e:
-            log(task_id, step, attempt, "retry", error=str(e))
+            log(run_id, step, attempt, "retry", error=str(e))
             time.sleep(0.5 * attempt)
 
     cached = load_cache(cache_key) if use_cache else None
     if cached:
-        log(task_id, step, retries, "fallback", recovery="cache", elapsed_ms=elapsed(start))
+        log(run_id, step, retries, "fallback", recovery="cache", elapsed_ms=elapsed(start))
         return {"data": cached, "source": "cache"}
 
-    log(task_id, step, retries, "fail")
+    log(run_id, step, retries, "fail")
     raise RuntimeError(f"{step} 복구 실패")
 ```
 - 바이탈 조회: `use_cache=True` (마지막 측정값으로 대체)
@@ -363,7 +415,7 @@ CREATE TABLE cache (
 );
 
 CREATE TABLE run_logs (
-  task_id TEXT, step TEXT, attempt INT,
+  run_id TEXT, step TEXT, attempt INT,
   status TEXT,               -- success / retry / fallback / fail / approved / rejected
   error TEXT, recovery TEXT, elapsed_ms INT, created_at TEXT
 );
@@ -401,30 +453,34 @@ SELECT AVG(elapsed_ms) FROM run_logs WHERE status = 'fallback';
 시나리오별 데이터를 파이썬 파일 하나에 넣고, MCP 도구는 이 값을 읽기만 합니다.
 데이터 시나리오는 `normal`, `heat`, `induction`, `fall`, `critical` **5개**입니다. 시나리오별 프로필·기대 결과는 [docs/scenarios.md](docs/scenarios.md)에 정리되어 있습니다.
 
+필드 이름은 `schemas.py`의 `VitalData`, `IndoorEnvironment`, `DeviceStatus`를 그대로 씁니다.
+
 ```python
-OFF = {"aircon": {"state": "off"}, "induction": {"state": "off", "minutes": 0, "temperature": 0}}
+OFF = {"air_conditioner": "off", "induction": "off",
+       "induction_minutes": None, "induction_temperature": None}
+
+def vital(hr, sbp, temp, spo2):
+    return {"heart_rate": hr, "systolic_bp": sbp, "temperature_c": temp, "spo2": spo2}
+
+def room(temp, humidity):
+    return {"temperature_c": temp, "humidity_percent": humidity}
 
 SCENARIOS = {
-  "normal":   {"vitals": {"hr": 72,  "sbp": 125, "temp": 36.5, "spo2": 98},
-               "env": {"temp": 24, "humidity": 50}, "devices": OFF,
-               "cctv": "assets/cctv/normal.jpg"},
-  "heat":     {"vitals": {"hr": 105, "sbp": 140, "temp": 37.8, "spo2": 96},
-               "env": {"temp": 33, "humidity": 75}, "devices": OFF,
-               "cctv": "assets/cctv/normal.jpg"},
-  "induction":{"vitals": {"hr": 80,  "sbp": 130, "temp": 36.6, "spo2": 97},
-               "env": {"temp": 26, "humidity": 55},
-               "devices": {"aircon": {"state": "off"},
-                           "induction": {"state": "on", "minutes": 120, "temperature": 300}},
-               "cctv": "assets/cctv/kitchen_empty.jpg"},
-  "fall":     {"vitals": {"hr": 118, "sbp": 120, "temp": 36.4, "spo2": 95},   # 심박만 위험 범위
-               "env": {"temp": 25, "humidity": 50}, "devices": OFF,
-               "cctv": "assets/cctv/fall.jpg"},
-  "critical": {"vitals": {"hr": 140, "sbp": 85,  "temp": 36.0, "spo2": 88},
-               "env": {"temp": 25, "humidity": 50}, "devices": OFF,
-               "cctv": "assets/cctv/lying.jpg"},
+  "normal":    {"vital": vital(72, 125, 36.5, 98),  "indoor_environment": room(24, 50),
+                "devices": OFF, "cctv": "assets/cctv/normal.jpg"},
+  "heat":      {"vital": vital(105, 140, 37.8, 96), "indoor_environment": room(33, 75),
+                "devices": OFF, "cctv": "assets/cctv/normal.jpg"},
+  "induction": {"vital": vital(80, 130, 36.6, 97),  "indoor_environment": room(26, 55),
+                "devices": {"air_conditioner": "off", "induction": "on",
+                            "induction_minutes": 120, "induction_temperature": 300},
+                "cctv": "assets/cctv/kitchen_empty.jpg"},
+  "fall":      {"vital": vital(118, 120, 36.4, 96), "indoor_environment": room(25, 50),   # 심박만 변화
+                "devices": OFF, "cctv": "assets/cctv/fall.jpg"},
+  "critical":  {"vital": vital(140, 85, 36.0, 88),  "indoor_environment": room(25, 50),   # 위험 범위 3개
+                "devices": OFF, "cctv": "assets/cctv/lying.jpg"},
 }
 ```
-> 수치는 시연용 가상값입니다. 기기 상태는 문자열이 아니라 `{"state", "minutes", "temperature"}` 구조로 받습니다.
+> 수치는 시연용 가상값입니다. 혈압은 수축기(`systolic_bp`)만 씁니다.
 
 ### 테스트 프로필 (가상 인물)
 
@@ -475,7 +531,7 @@ CCTV 캡처처럼 보이는 이미지를 시나리오별로 미리 준비해 두
 ```
 
 **결과 사용**
-- `fall_suspected: true`면 바이탈과 상관없이 위험도를 **위급**으로 올립니다.
+- `posture: "fallen"`이고 신뢰도가 낮지 않으면 낙상 축이 **위급**이 됩니다(바이탈과 상관없음). 흐린 사진이나 자세와 플래그가 어긋나면 "낙상 의심(확인 필요)"으로 **경고**입니다. (9장)
 - 승인 화면과 보호자용 결과에 **캡처 이미지 + 한 문장 설명**을 함께 보여줘서, 보호자가 눈으로 확인하고 승인할 수 있게 합니다.
 - 판단은 "의심" 수준으로만 표현하고 확진처럼 쓰지 않습니다.
 
@@ -485,51 +541,87 @@ CCTV 캡처처럼 보이는 이미지를 시나리오별로 미리 준비해 두
 
 위험도는 **정상 / 주의 / 경고 / 위급** 4단계이며, Emergency Agent가 코드 규칙으로 판정합니다.
 
-> 아래 기준은 **시연용 예시 규칙**이며 의학적 기준이 아닙니다. 팀에서 확정한 값을 이 표에 기록합니다.
+> 아래 기준은 **시연용 예시 규칙**이며 의학적 기준이 아닙니다. 구현은 `backend/src/rules/risk.py`(해든)입니다. 출처(NEWS2 RCP 2017, 질병관리청, WHO)는 발표 전 원문을 확인합니다.
 
-### 위험 범위 기준
+### 바이탈 점수 (NEWS2 기반)
 
-| 항목                | 위험 범위                                |
-| ------------------- | ---------------------------------------- |
-| 심박 (`hr`)         | < 50 또는 > 110                          |
-| 수축기 혈압 (`sbp`) | < 90 또는 > 160                          |
-| 체온 (`temp`)       | < 35.5 또는 > 37.5                       |
-| 산소포화도 (`spo2`) | < 94                                     |
-| 실내 온도           | ≥ 30 (고온) 또는 ≤ 16 (저온)             |
-| 인덕션 장시간 켜짐  | `state == "on"` 이고 `minutes ≥ 60`      |
-| 인덕션 과열         | `state == "on"` 이고 `temperature ≥ 250` |
+항목마다 0~3점. **3점 = 위험 범위**, 1~2점 = 바이탈 변화.
 
-### 판정 순서
+| 항목                           | 0점        | 1점                  | 2점       | 3점 (위험 범위)  |
+| ------------------------------ | ---------- | -------------------- | --------- | ---------------- |
+| 심박 `heart_rate` (회/분)      | 51~90      | 41~50, 91~110        | 111~130   | ≤40, ≥131        |
+| 수축기 혈압 `systolic_bp`      | 111~219    | 101~110              | 91~100    | ≤90, ≥220        |
+| 체온 `temperature_c` (℃)       | 36.1~38.0  | 35.1~36.0, 38.1~39.0 | 39.1~39.9 | ≤35.0, ≥40.0     |
+| 산소포화도 `spo2` (%)          | ≥96        | 94~95                | 92~93     | ≤91              |
 
-| 우선순위 | 조건                                                              | 위험도                        |
-| -------- | ----------------------------------------------------------------- | ----------------------------- |
-| 1        | CCTV 쓰러짐 의심, 또는 바이탈 중 2개 이상이 위험 범위             | 위급                          |
-| 2        | 바이탈 1개가 위험 범위, 또는 실내 고온·저온 + 바이탈 변화         | 경고                          |
-| 3        | 실내 환경 이상만 있음, 또는 사람 없음 + 인덕션 장시간 켜짐·과열   | 주의                          |
-| 4        | 이상 없음                                                         | 정상 (Handoff Guard에서 종료) |
+체온 40.0℃ 이상을 3점으로 둔 것만 NEWS2 원표와 다릅니다 (질병관리청 열사병 기준).
 
-취약도 "상"이면 위험도를 한 단계 올립니다 (최대 "위급"). 단, **정상은 올리지 않습니다.**
+### 실내 온도·기기 기준
+
+| 항목                           | 기준                                                                     |
+| ------------------------------ | ------------------------------------------------------------------------ |
+| 실내 이상                      | 28℃ 초과 또는 20℃ 미만                                                   |
+| 실내 극한                      | 31℃ 초과 또는 18℃ 미만                                                   |
+| 에어컨 목표 온도               | 4~10월 24~26℃, 11~3월 20~22℃ (고온이면 상한으로 냉방, 저온이면 하한으로 난방) |
+| 인덕션 방치                    | CCTV에 사람 없음 + `induction == "on"` + (`induction_minutes ≥ 60` 또는 `induction_temperature ≥ 250`) |
+
+### 판정 축 4개
+
+원인마다 축과 단계를 매기고, **최종 위험도 = 가장 높은 축** (+ 축을 넘는 규칙) **+ 취약도 보정**입니다. 바이탈이 정상이어도 낙상 축만으로 위급이 될 수 있습니다.
+
+| 축                      | 원인                                                         | 단계 |
+| ----------------------- | ------------------------------------------------------------ | ---- |
+| `fall` 낙상             | CCTV가 쓰러진 자세를 분명히 봄 (`FALL_DETECTED`)             | 위급 |
+|                         | 흐린 사진·자세와 플래그 불일치 등 약한 신호 (`FALL_SUSPECTED`) | 경고 |
+|                         | 낙상 의심 + 바이탈 위험 범위 (`FALL_WITH_VITAL_DANGER`)      | 위급 |
+| `cardio` 심뇌           | 심박·혈압 3점 / 1~2점                                        | 경고 / 주의 |
+| `respiratory` 호흡      | 산소포화도 3점 / 1~2점                                       | 경고 / 주의 |
+| `environment` 환경      | 체온 3점 / 1~2점                                             | 경고 / 주의 |
+|                         | 실내 극한                                                    | 경고 |
+|                         | 실내 이상 + 바이탈 변화 / 실내 이상만                        | 경고 / 주의 |
+|                         | 인덕션 방치                                                  | 주의 |
+| **축을 넘는 규칙**      | 위험 범위(3점) 항목 2개 이상 (`VITAL_DANGER_MULTI`)          | 위급 |
+
+- **낙상 상태** (`fall_state`): `none` / `false_alarm`(오탐 가능, 기록만) / `suspected`(의심) / `confirmed`(확인) / `critical`(낙상 + 바이탈 위험)
+- **취약도 보정**: 취약도 "상"(또는 프로필 없음)이면 한 단계 올립니다 (최대 "위급"). 단, **정상은 올리지 않습니다.**
+- **정보 누락**: 바이탈 FAIL → 안전 종료(Join Guard), CCTV 판단 불가 → 바이탈만으로 판정, 프로필 없음 → 취약도 "상"
+
+### 119 자동 연결 (`auto_119`)
+
+다음을 **모두** 만족하면 보호자 승인 없이 119에 바로 연결합니다 (`VITAL_SEVERE`).
+
+1. 최종 위험도가 위급
+2. 바이탈 위험 범위(3점) 항목 2개 이상
+3. 바이탈 4항목 점수 합 7점 이상
+4. 최신 측정값 (`source`가 `cache`가 아님. 이전 측정값은 센서 오류일 수 있음)
+
+그 밖의 119는 모두 보호자 승인을 받습니다.
+
+### 원인별 조치안 (코드가 정하고, LLM은 설명만 씀)
+
+| 원인                                                   | 조치안                                  | 승인 필요 |
+| ------------------------------------------------------ | --------------------------------------- | --------- |
+| `VITAL_SEVERE`                                         | 119 자동 연결                           | ❌ (자동) |
+| 낙상 축 위급, 위험 범위 2개 이상                       | 119 호출                                | ✅         |
+| 실내 이상·극한 (고온)                                  | 에어컨 냉방 (목표 온도 상한)            | ✅         |
+| 실내 이상·극한 (저온)                                  | 에어컨 난방 (목표 온도 하한)            | ✅         |
+| 인덕션 방치                                            | 인덕션 끄기                             | ✅         |
+| 119를 부르거나, 바이탈 위험 범위(3점) + 경고 이상      | 가까운 병원 정보 (`find_hospital`)      | ❌         |
+| 정상이 아닌 모든 경우                                  | 보호자 알림 (승인 요청 / 긴급 알림 / 정보) | ❌      |
 
 ### 시나리오별 기대 결과
 
-| 시나리오    | 프로필 (취약도)   | 판정 근거                          | 최종 위험도           | 조치안 (승인 필요)                      |
-| ----------- | ----------------- | ---------------------------------- | --------------------- | --------------------------------------- |
-| `normal`    | `profile-01` (상) | 이상 없음                          | 정상 (보정 안 함)     | 없음                                    |
-| `heat`      | `profile-02` (중) | 체온 + 실내 고온 33℃               | 경고                  | 에어컨 켜기 ✅ / 보호자 알림 / 병원 정보 |
-| `induction` | `profile-03` (하) | 사람 없음 + 인덕션 120분·300℃      | 주의                  | 인덕션 끄기 ✅                           |
-| `fall`      | `profile-01` (상) | **CCTV 쓰러짐 의심** + 심박        | 위급                  | 119 호출 ✅ / 응급실 정보 / 보호자 알림  |
-| `critical`  | `profile-01` (상) | 바이탈 3개 위험 (심박·혈압·SpO2)   | 위급                  | 119 호출 ✅ / 응급실 정보 / 보호자 알림  |
+자세한 계산은 [docs/scenarios.md](docs/scenarios.md)에 있습니다.
 
-`fall`은 바이탈만 보면 "경고"지만 CCTV 분석 결과로 "위급"이 됩니다.
+| 시나리오    | 프로필 (취약도)   | 판정 근거                                   | 최종 위험도       | 조치안                                           |
+| ----------- | ----------------- | ------------------------------------------- | ----------------- | ------------------------------------------------ |
+| `normal`    | `profile-01` (상) | 이상 없음                                   | 정상 (보정 안 함) | 없음                                             |
+| `heat`      | `profile-02` (중) | 실내 온도 극한(33℃) + 심박·혈압 변화         | 경고              | 에어컨 냉방 ✅ / 보호자 알림                       |
+| `induction` | `profile-03` (하) | 사람 없는 곳에서 인덕션 오래 켜짐            | 주의              | 인덕션 끄기 ✅ / 보호자 알림                       |
+| `fall`      | `profile-01` (상) | **CCTV 쓰러짐 의심** + 심박·혈압 변화        | 위급              | 119 호출 ✅ / 병원 정보 / 보호자 알림              |
+| `critical`  | `profile-01` (상) | 심박·혈압·산소포화도 위험 범위 (점수 합 10)  | 위급              | **119 자동 연결** / 병원 정보 / 보호자 긴급 알림   |
 
-### 위험 원인별 조치안
-
-| 원인                                   | 조치안                        | 승인 필요 |
-| -------------------------------------- | ----------------------------- | --------- |
-| 실내 고온                              | 에어컨 켜기                   | ✅         |
-| 사람 없음 + 인덕션 장시간 켜짐·과열    | 인덕션 끄기                   | ✅         |
-| 바이탈 이상                   | 보호자 알림, 가까운 병원 정보 | 알림은 ❌  |
-| 쓰러짐 의심, 바이탈 다수 이상 | 119 호출, 응급실 정보         | ✅         |
+`fall`은 바이탈만 보면 "주의"지만 CCTV 분석 결과로 "위급"이 됩니다.
 
 ---
 
@@ -572,7 +664,7 @@ CCTV 캡처처럼 보이는 이미지를 시나리오별로 미리 준비해 두
 
 | Method | Endpoint        | 설명                                                                        |
 | ------ | --------------- | --------------------------------------------------------------------------- |
-| POST   | `/care/run`     | 모니터링 → 위험 판정 → 조치안 생성. 조치가 필요하면 `pending_approval` 반환 |
+| POST   | `/care/run`     | 모니터링 → 위험 판정 → 조치안 생성. 조치가 필요하면 `pending_approval` 반환 (`auto_119`면 바로 실행 후 `done`) |
 | POST   | `/care/approve` | 보호자 승인/거절 처리 → 조치 실행 → 결과 반환                               |
 | GET    | `/health`       | 서버 상태 확인                                                              |
 | GET    | `/logs`         | 최근 실행 기록 조회                                                         |
@@ -581,20 +673,23 @@ CCTV 캡처처럼 보이는 이미지를 시나리오별로 미리 준비해 두
 
 ```json
 {
-  "person": "profile-01",
+  "profile_id": "profile-01",
   "scenario": "fall",
   "fault": ["vision"]
 }
 ```
+- `scenario`: `normal` / `heat` / `induction` / `fall` / `critical`
+- `fault` (선택): `vital` / `iot` / `vision` / `llm`. 생략하면 장애 없이 실행
 
 **`POST /care/approve` 요청 예시**
 
 ```json
 {
-  "task_id": "task-102",
-  "approved": true
+  "run_id": "run-102",
+  "decision": "approve"
 }
 ```
+- `decision`: `approve` / `reject`
 
 ---
 
@@ -616,7 +711,7 @@ CCTV 캡처처럼 보이는 이미지를 시나리오별로 미리 준비해 두
 | PM ↔ 전체                    | 일정, 산출물 담당·마감, 시나리오 목록, 문서와 실제 구현이 일치하는지 확인                          |
 | 오케스트레이터 ↔ 전체        | CareStatusResult, EmergencyResult, `/care/run`·`/care/approve` 요청·응답 형식, `current_step` 문구 |
 | 데이터·MCP ↔ AutoHealing     | 도구 함수 이름과 반환 형식, 실패 시 예외 그대로 던지기                                             |
-| AutoHealing ↔ 오케스트레이터 | `source`(live/cache) 표시, 최종 실패 시 예외로 알리기                                              |
+| AutoHealing ↔ 오케스트레이터 | `source`(live/cache/mock/mixed) 표시, 최종 실패 시 예외로 알리기                                   |
 | LLM ↔ 데이터·MCP             | CCTV 분석 함수 이름·입출력 형식, MCP 서버 안 파일 위치 (해든은 분석 함수, 두나는 도구 등록만), 사용할 LLM 모델과 키 설정 |
 | LLM ↔ 오케스트레이터         | CCTV 분석 결과 JSON 형식 (CareStatusResult의 `cctv` 필드)                                          |
 | LLM ↔ AutoHealing            | 필수 키 목록, 템플릿 문구                                                                          |
@@ -685,16 +780,17 @@ docker compose up --build
 | 순서 | 실행                       | 보여줄 장면                                                                                            |
 | ---- | -------------------------- | ------------------------------------------------------------------------------------------------------ |
 | 1    | `normal`                   | 모두 정상 → Handoff Guard에서 종료, "이상 없음"                                                        |
-| 2    | `heat`                     | 실내 고온 + 체온 상승 → 경고 → 에어컨 켜기 조치안 → 보호자 승인 → 에어컨 켜짐                          |
+| 2    | `heat`                     | 실내 극한 고온(33℃) + 심박 변화 → 경고 → 에어컨 냉방 조치안 → 보호자 승인 → 에어컨 켜짐               |
 | 3    | `induction`                | CCTV에 주방이 비어 있음 + 인덕션 120분·300℃ → 주의 → 인덕션 끄기 승인                                  |
 | 4    | `fall`                     | **CCTV 이미지를 LLM이 분석해 쓰러짐 의심 판단** → 위급 → 캡처와 함께 보호자 승인 요청 → 119 호출(mock) |
-| 5    | `critical`                 | 바이탈 3개 위험 → 위급 → 119 호출 승인                                                                 |
+| 5    | `critical`                 | 바이탈 위험 범위 3개(점수 합 10) → 위급 → **승인 없이 119 자동 연결** → 보호자에게 긴급 알림           |
 | 6    | `heat` + `vital` 장애      | 바이탈 재시도 3회 → 캐시 사용 → "n분 전 측정값"으로 정상 진행 (2번에서 캐시가 채워짐)                  |
 | 7    | `heat` + `iot` 장애        | 에어컨 제어 재시도 3회 → FAIL → 보호자에게 "직접 조치 필요"                                            |
-| 8    | `critical` + `vision` 장애 | 영상 판단 불가 → 바이탈 기준으로 위급 판정 + 원본 이미지로 확인 요청                                   |
+| 8    | `critical` + `vision` 장애 | 영상 판단 불가 → 바이탈만으로 위급 판정 → 119 자동 연결 + 원본 이미지로 확인 요청                      |
 | 9    | `fall` + `llm` 장애        | 안내문 생성 실패 → 재요청 1회 → 템플릿 문구로 안내                                                     |
 
 4번에서는 화면에 **캡처 이미지 → LLM 분석 결과(한 문장) → 위험도 상승 → 승인 요청**이 한 흐름으로 보이게 합니다.
+4번(승인 후 119)과 5번(자동 119)을 이어서 보여주면 "승인이 원칙, 바이탈이 매우 위험할 때만 예외"라는 차이가 드러납니다.
 6~9번에서는 화면 아래 AutoHealing 로그에 재시도·폴백·FAIL 과정이 보이게 합니다.
 
 ### 시험 기록표
@@ -724,8 +820,8 @@ docker compose up --build
 - CCTV 이미지는 보호자 화면에서만 보여주고, 어르신용 안내에는 넣지 않습니다.
 - 지병명 원문은 다음 단계로 넘기거나 로그에 남기지 않고, **취약도(상/중/하)만** 전달합니다.
 - LLM은 질병 진단이나 약 복용 조언을 하지 않으며, CCTV 판단은 "의심" 수준으로만 표현합니다.
-- 기기 제어와 119 호출은 **보호자 승인 없이 실행하지 않습니다.**
-- 모든 실행에는 `task_id`를 붙여 로그로 추적합니다.
+- 기기 제어와 119 호출은 **보호자 승인 없이 실행하지 않습니다.** 예외는 바이탈이 매우 위험할 때(`VITAL_SEVERE`)의 119 자동 연결뿐이며, 이때도 보호자에게 즉시 알립니다.
+- 모든 실행에는 `run_id`를 붙여 로그로 추적합니다.
 
 ---
 

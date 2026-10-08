@@ -5,9 +5,9 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
-Scenario = Literal["normal", "heat", "induction", "fall"]
+Scenario = Literal["normal", "heat", "induction", "fall", "critical"]
 FaultName = Literal["vital", "iot", "vision", "llm"]
-DataSource = Literal["mock", "cache", "mixed"]
+DataSource = Literal["live", "mock", "cache", "mixed"]
 RiskLevel = Literal["정상", "주의", "경고", "위급"]
 CareStatus = Literal[
     "no_issue",
@@ -24,7 +24,7 @@ ActionTool = Literal[
     "find_hospital",
 ]
 RiskAxis = Literal["fall", "cardio", "respiratory", "environment"]
-Auto119Reason = Literal["ELDER_NO_RESPONSE", "VITAL_SEVERE"]
+Auto119Reason = Literal["VITAL_SEVERE"]
 
 
 # ---------- POST /care/run 요청 ----------
@@ -46,7 +46,6 @@ class VitalData(BaseModel):
     # 유효한 Vital 조회 결과에 필요한 값
     heart_rate: int
     systolic_bp: int = Field(title="최고 혈압")
-    diastolic_bp: int = Field(title="최저 혈압")
     temperature_c: float
     spo2: int
 
@@ -67,6 +66,9 @@ class DeviceStatus(BaseModel):
 
     # 인덕션 작동 시간(분). 꺼져 있거나 시간을 알 수 없으면 None
     induction_minutes: int | None = None
+
+    # 인덕션 온도(℃). 꺼져 있거나 알 수 없으면 None
+    induction_temperature: int | None = None
 
 
 # ---------- 해든 담당 CCTV 분석 결과 ----------
@@ -89,20 +91,6 @@ class CctvAnalysis(BaseModel):
 
     # 분석 완료·판단 불가·처리 실패
     status: Literal["analyzed", "unavailable", "failed"] = "unavailable"
-
-
-class FallEvent(BaseModel):
-    # 낙상 시나리오에서 제공되는 사건 정보. 없는 항목은 None
-    watch_fall: bool | None = None
-    voice_response: Literal["ok", "help", "none"] | None = None
-    immobile_seconds: int | None = None
-    head_impact_suspected: bool | None = None
-
-
-class Signs(BaseModel):
-    # 추가 증상이 있는 경우에만 제공
-    abnormal_behavior: bool | None = None
-    breathing_distress: bool | None = None
 
 
 # ---------- Orchestration 1 집계 결과 ----------
@@ -130,13 +118,7 @@ class CareStatusResult(BaseModel):
     # 선택: 병원 검색 지역. 프로필 주소에서 채우며 없으면 기본 Mock 목록 사용
     area: str | None = None
 
-    # 선택: 낙상 사건 정보는 해당 시나리오에서만 전달
-    fall_event: FallEvent | None = None
-
-    # 선택: 관찰된 이상 행동·호흡 곤란 정황
-    signs: Signs | None = None
-
-    # 선택: 데이터가 전부 Mock이거나 일부 캐시일 수 있음
+    # 선택: 실시간·Mock·캐시 또는 일부 캐시가 섞인 데이터일 수 있음
     source: DataSource = "mock"
 
     # 선택: 오류·복구 요약. 민감한 원문 정보는 기록하지 않음
@@ -172,8 +154,8 @@ class EmergencyResult(BaseModel):
     # 선택: 보호자에게 보여줄 판정 근거
     reasons: list[str] = Field(default_factory=list)
 
-    # 선택: 네 축별 점수. 점수 형식은 해든 evaluate() 반환 규격과 맞출 것
-    axes: dict[RiskAxis, int] = Field(default_factory=dict)
+    # 선택: 네 축별 단계. 해든 evaluate()의 axes 반환값(축 → 위험도 문자열)과 같음
+    axes: dict[RiskAxis, RiskLevel] = Field(default_factory=dict)
 
     # 선택: 해든이 정의한 낙상 상태 5종 중 하나
     # 정확한 허용 문자열을 전달받으면 Literal로 좁힐 것

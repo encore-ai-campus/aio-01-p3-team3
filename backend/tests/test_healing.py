@@ -19,7 +19,7 @@ def db(tmp_path):
 
 
 def vital(age=0, heart_rate=72):
-    return {'heart_rate': heart_rate, 'systolic_bp': 125, 'diastolic_bp': 80,
+    return {'heart_rate': heart_rate, 'systolic_bp': 125,
             'temperature_c': 36.5, 'spo2': 98,
             'measured_at': datetime.fromtimestamp(NOW-age, timezone.utc).isoformat()}
 

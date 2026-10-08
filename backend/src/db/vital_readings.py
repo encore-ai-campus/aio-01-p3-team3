@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 
-VITAL_FIELDS = ('heart_rate', 'systolic_bp', 'diastolic_bp', 'temperature_c', 'spo2')
+VITAL_FIELDS = ('heart_rate', 'systolic_bp', 'temperature_c', 'spo2')
 
 
 class ReadingConflict(ValueError):
@@ -86,9 +86,9 @@ class VitalReadings:
                             raise ReadingConflict('reading_id already used for another payload')
                         return {'status': 'duplicate', 'reading_id': reading_id, 'attempts': attempt}
                     conn.execute('''INSERT INTO vital_readings
-                        (reading_id,profile_id,scenario,heart_rate,systolic_bp,diastolic_bp,
+                        (reading_id,profile_id,scenario,heart_rate,systolic_bp,
                          temperature_c,spo2,measured_at,measured_at_epoch,received_at,received_at_epoch)
-                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)''',
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
                         (reading_id, profile_id, scenario, *values, measured_at, measured_epoch,
                          received_at, received_epoch))
                 return {'status': 'inserted', 'reading_id': reading_id, 'attempts': attempt}

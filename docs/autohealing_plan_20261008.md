@@ -52,7 +52,7 @@ Mock 조회를 실제로 어디에서 호출할지는 지혜/두나와 연결 �
 
 1. vital_readings 테이블/인덱스와 저장·최신 조회 repository.
    제안 컬럼: id, reading_id, profile_id, scenario(시연 격리용 여부 합의),
-   heart_rate, systolic_bp, diastolic_bp, temperature_c, spo2,
+   heart_rate, systolic_bp, temperature_c, spo2,
    measured_at(원본 ISO), measured_at_epoch(정렬용), received_at.
    reading_id UNIQUE 또는 별도 중복 키를 두나/지혜와 합의한다.
    최신 조회 인덱스는 profile_id, 필요하면 scenario, measured_at_epoch 순.

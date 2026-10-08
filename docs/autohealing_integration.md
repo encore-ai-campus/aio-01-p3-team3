@@ -84,7 +84,7 @@ latest = repo.latest(profile_id, scenario=scenario, max_age_s=freshness_seconds)
 
 - save는 inserted/duplicate와 attempts 반환. 같은 ID의 다른 payload는 ReadingConflict.
   reading_id는 전체 테이블에서 고유하므로 시뮬레이터는 UUID 등의 고유 ID를 사용하세요.
-- 데이터 필드는 heart_rate/systolic_bp/diastolic_bp/temperature_c/spo2/measured_at.
+- 데이터 필드는 heart_rate/systolic_bp/temperature_c/spo2/measured_at.
   타입·유한 숫자·시간대·미래시각만 검사합니다. 위험도/생리적 범위 검증은 수집 API/규칙 담당.
 - latest는 측정시각 순으로 조회합니다. 재전송이 freshness를 갱신하지 않습니다.
   max_age_s 필수이며 팀 최신성 기준을 임의로 정하지 않습니다.
