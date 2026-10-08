@@ -1,7 +1,7 @@
 """
-FastAPI 앱 — 기화(④), 지혜(⑤)
+FastAPI 앱 — 기화(④), 두나(⑤)
 보호자가 어르신과 시나리오를 고르면 /care/run이 모니터링과 위험 판정을 실행하고,
-조치가 필요하면 pending_approval을 반환한다. (/care/approve는 ⑤에서 연결)
+조치가 필요하면 pending_approval을 반환하고 /care/approve가 Action과 Summary를 실행한다.
 """
 
 from contextlib import asynccontextmanager
@@ -20,8 +20,14 @@ from src import mcp_client  # noqa: E402
 from src.db.database import Database  # noqa: E402
 from src.db.seed import seed_profiles  # noqa: E402
 from src.db.vital_service import VitalService  # noqa: E402
+from src.orchestrator.approval_flow import (  # noqa: E402
+    PendingApprovalNotFound,
+    process_care_approval,
+)
 from src.orchestrator.care import run_care  # noqa: E402
 from src.schemas import (  # noqa: E402
+    CareApprovalRequest,
+    CareApprovalResponse,
     CareRunRequest,
     CareRunResponse,
     VitalReadingCreate,
@@ -89,3 +95,19 @@ def create_vital_reading(
 async def care_run(request: CareRunRequest, db: Database = Depends(get_db)) -> CareRunResponse:
     """모니터링 → 위험 판정 → 조치안 생성. 조치가 필요하면 pending_approval (README 6장 응답 1)."""
     return await run_care(request, db=db)
+
+
+@app.post("/care/approve", response_model=CareApprovalResponse)
+async def care_approve(
+    request: CareApprovalRequest,
+    db: Database = Depends(get_db),
+) -> CareApprovalResponse:
+    """보호자 결정에 따라 Action을 실행하고 Summary 결과를 반환한다."""
+
+    try:
+        return await process_care_approval(request, db=db)
+    except PendingApprovalNotFound as error:
+        raise HTTPException(
+            status_code=404,
+            detail="승인 대기 중인 run_id가 없거나 이미 처리되었습니다.",
+        ) from error
