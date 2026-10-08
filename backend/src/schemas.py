@@ -81,6 +81,12 @@ class VitalReadingCreate(BaseModel):
         description="심박수를 실제로 측정한 시각(전송 시각과 다를 수 있음)",
     )
 
+    # 선택: 시나리오별 시뮬레이션 데이터 구분용. 생략하면 일반 수집 데이터로 저장
+    scenario: Scenario | None = Field(
+        default=None,
+        description="시나리오별 측정 데이터인 경우 시나리오 이름",
+    )
+
 
 class VitalReadingResponse(BaseModel):
     """바이탈 데이터 저장 완료 응답."""

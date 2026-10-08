@@ -7,6 +7,7 @@ FastAPI 앱 — 기화(④), 지혜(⑤)
 from contextlib import asynccontextmanager
 from functools import lru_cache
 from pathlib import Path
+from uuid import uuid4
 
 from dotenv import load_dotenv
 
@@ -18,8 +19,14 @@ from fastapi import Depends, FastAPI, HTTPException  # noqa: E402
 from src import mcp_client  # noqa: E402
 from src.db.database import Database  # noqa: E402
 from src.db.seed import seed_profiles  # noqa: E402
+from src.db.vital_service import VitalService  # noqa: E402
 from src.orchestrator.care import run_care  # noqa: E402
-from src.schemas import CareRunRequest, CareRunResponse  # noqa: E402
+from src.schemas import (  # noqa: E402
+    CareRunRequest,
+    CareRunResponse,
+    VitalReadingCreate,
+    VitalReadingResponse,
+)
 
 
 @lru_cache
@@ -53,6 +60,29 @@ async def ready() -> dict:
     except mcp_client.McpConnectionError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
     return {"status": "ok", "mcp": mcp_client.MCP_URL, "tools": tools}
+
+
+@app.post("/vitals/readings", response_model=VitalReadingResponse)
+def create_vital_reading(
+    request: VitalReadingCreate,
+    db: Database = Depends(get_db),
+) -> VitalReadingResponse:
+    """바이탈 측정 요청을 검증하고 저장 서비스에 전달한다."""
+    # reading_id는 외부 요청에 노출하지 않는 DB 내부 식별자다.
+    reading_id = str(uuid4())
+
+    # DB 서비스는 측정 시각을 ISO 문자열로 받으므로 JSON 모드로 변환한다.
+    reading = request.model_dump(mode="json")
+    reading["reading_id"] = reading_id
+
+    # SQLite 저장 함수는 동기 함수이며, FastAPI의 동기 경로에서 실행한다.
+    VitalService(db).save_vital_reading(reading)
+
+    # 응답은 합의된 계약대로 저장 상태와 대상 프로필·측정 시각만 반환한다.
+    return VitalReadingResponse(
+        profile_id=request.profile_id,
+        measured_at=request.measured_at,
+    )
 
 
 @app.post("/care/run", response_model=CareRunResponse)
