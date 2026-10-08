@@ -1,4 +1,4 @@
-"""승인 대기(pending_approval) 저장·조회, run_id 기준 — 기화(④ 저장) / 지혜(⑤ 꺼내 쓰기)
+"""승인 대기(pending_approval) 저장·조회, run_id 기준 — 기화(④ 저장) / 두나(⑤ 처리)
 
 /care/run이 승인 대기 상태를 저장하고, /care/approve(⑤)가 run_id로 꺼내 쓴다.
 저장하는 값:
@@ -20,10 +20,23 @@ class PendingApprovals:
         self._lock = threading.Lock()
         self._clock = clock
 
-    def save(self, run_id: str, *, care_status: dict, emergency: dict, raw: dict) -> None:
+    def save(
+        self,
+        run_id: str,
+        *,
+        care_status: dict,
+        emergency: dict,
+        raw: dict,
+        fault: list[str] | None = None,
+    ) -> None:
         with self._lock:
-            self._items[run_id] = {"care_status": care_status, "emergency": emergency, "raw": raw,
-                                   "created_at": self._clock()}
+            self._items[run_id] = {
+                "care_status": care_status,
+                "emergency": emergency,
+                "raw": raw,
+                "fault": list(fault or []),
+                "created_at": self._clock(),
+            }
 
     def get(self, run_id: str) -> dict | None:
         with self._lock:

@@ -27,6 +27,24 @@ RISK_LABELS = {
     "경고": "경고",
     "위급": "위급",
 }
+PROFILE_LABELS = {
+    "profile-01": "어르신 A (취약도 상)",
+    "profile-02": "어르신 B (취약도 중)",
+    "profile-03": "어르신 C (취약도 하)",
+}
+SCENARIO_LABELS = {
+    "normal": "정상",
+    "heat": "폭염",
+    "induction": "인덕션 방치",
+    "fall": "낙상",
+    "critical": "바이탈 위급",
+}
+FAULT_LABELS = {
+    "vital": "바이탈 장애",
+    "iot": "IoT 장애",
+    "vision": "CCTV 분석 장애",
+    "llm": "LLM 장애",
+}
 
 
 def store_pending_approval(
@@ -212,6 +230,61 @@ def _submit_decision(
 
     st.session_state["approval_result"] = result
     render_approval_result(result)
+
+
+def render_care_workflow(backend_url: str) -> None:
+    """실제 ``/care/run``과 ``/care/approve``를 연결한 보호자 흐름을 그린다."""
+
+    with st.sidebar:
+        st.header("상태 확인 설정")
+        profile_id = st.selectbox(
+            "어르신",
+            options=list(PROFILE_LABELS),
+            format_func=PROFILE_LABELS.__getitem__,
+        )
+        scenario = st.selectbox(
+            "시연 시나리오",
+            options=list(SCENARIO_LABELS),
+            format_func=SCENARIO_LABELS.__getitem__,
+        )
+        fault = st.multiselect(
+            "장애 주입",
+            options=list(FAULT_LABELS),
+            format_func=FAULT_LABELS.__getitem__,
+        )
+        run_clicked = st.button(
+            "상태 확인하기",
+            type="primary",
+            use_container_width=True,
+        )
+
+    if run_clicked:
+        for key in (
+            "run_response",
+            "run_id",
+            "care_status",
+            "emergency",
+            "approval_result",
+        ):
+            st.session_state.pop(key, None)
+        try:
+            with st.spinner("바이탈·IoT·CCTV 상태를 확인하고 있습니다..."):
+                response = request_care_run(
+                    backend_url,
+                    profile_id,
+                    scenario,
+                    list(fault),
+                )
+        except (BackendAPIError, ValueError) as exc:
+            st.error(str(exc))
+        else:
+            st.session_state["run_response"] = response
+
+    response = st.session_state.get("run_response")
+    if isinstance(response, dict):
+        render_approval_panel(response, backend_url)
+    else:
+        st.info("왼쪽에서 어르신과 시나리오를 선택한 뒤 상태를 확인해 주세요.")
 
 
 def render_approval_panel(

@@ -1,7 +1,7 @@
 """/care/run 전체 흐름 — 기화 (README 3장)
 
 Orchestration 1(모니터링) → Join Guard → Emergency(판정·조치안) → Handoff Guard → Approval Gate(승인 대기 저장)
-조치 실행과 Summary(/care/approve)는 ⑤ 지혜 님.
+조치 실행과 Summary(/care/approve)는 ⑤ 두나 님.
 """
 
 import uuid
@@ -48,9 +48,15 @@ async def run_care(request: CareRunRequest, *, db, run_id: str | None = None) ->
         return CareRunResponse(run_id=run_id, status="no_issue", care_status=care_status, emergency=emergency,
                                message="이상 없음", current_step=f"{STEP_MONITOR} → 위험 판정: 이상 없음 → 종료")
 
-    # TODO(⑤ 지혜): emergency.requires_approval이 False(보호자 알림·병원 정보만)면 승인 없이 바로 실행하고
+    # TODO(⑤ 두나): emergency.requires_approval이 False(보호자 알림·병원 정보만)면 승인 없이 바로 실행하고
     #   Summary까지 진행. 다섯 시연 시나리오에는 이런 경우가 없다 (위험이 있으면 항상 기기 제어나 119가 포함됨).
-    pending.save(run_id, care_status=care_status.model_dump(), emergency=emergency.model_dump(), raw=raw)
+    pending.save(
+        run_id,
+        care_status=care_status.model_dump(),
+        emergency=emergency.model_dump(),
+        raw=raw,
+        fault=list(request.fault),
+    )
     return CareRunResponse(run_id=run_id, status="pending_approval", care_status=care_status, emergency=emergency,
                            message=raw["reason"],
                            current_step=f"{STEP_MONITOR} → 위험 판정 완료({emergency.risk_level}) → 보호자 승인 대기")
