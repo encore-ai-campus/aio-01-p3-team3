@@ -758,7 +758,7 @@ docker compose up --build
 | 파일                     | 변수                                | 비고                                                                                                       |
 | ------------------------ | ----------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `frontend/config/.env`   | `BACKEND_URL`                       | 루트 compose에서는 `http://backend:8000`으로 자동 설정                                                     |
-| `backend/config/.env`    | `WEATHER_MCP_URL`                   | MCP 서버 주소. 루트 compose에서는 `http://mcp:8010/mcp`로 자동 설정 (변수명은 코드 수정 시 함께 변경 예정) |
+| `backend/config/.env`    | `MCP_URL`                           | MCP 서버 주소. 루트 compose에서는 `http://mcp:8010/mcp`로 자동 설정                                        |
 | `backend/config/.env`    | `OPENAI_API_KEY` / `GEMINI_API_KEY` | 사용하는 LLM의 키 하나                                                                                     |
 | `backend/config/.env`    | `DB_PATH`                           | compose에서 `/app/data/app.db`로 자동 설정                                                                 |
 | `mcp_server/config/.env` | `OPENAI_API_KEY` / `GEMINI_API_KEY` | CCTV 이미지 분석용 (이미지 입력 지원 모델)                                                                 |
