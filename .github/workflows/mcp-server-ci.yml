@@ -45,7 +45,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements/test.txt
       - name: Test MCP server
-        run: python -m pytest tests/test_server.py -q
+        run: python -m pytest tests/ -q
       - name: Prepare CI environment file
         run: cp config/.env.docker.example .env.docker
       - name: Validate Compose

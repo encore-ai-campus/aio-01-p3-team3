@@ -1,0 +1,49 @@
+# 로컬 통합 실행용 compose 파일입니다. (배포는 서비스별 deploy/compose.yml 사용)
+# 실행: docker compose up --build
+# 환경변수는 각 서비스의 config/.env를 읽고, 서비스 간 주소만 아래 environment로 덮어씁니다.
+name: heat-cold-alert
+
+services:
+  mcp:
+    build:
+      context: ./mcp_server
+      dockerfile: deploy/Dockerfile
+    env_file:
+      - path: ./mcp_server/config/.env
+        required: false
+    ports:
+      - "8010:8010"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: deploy/Dockerfile
+    env_file:
+      - path: ./backend/config/.env
+        required: false
+    environment:
+      WEATHER_MCP_URL: http://mcp:8010/mcp
+      DB_PATH: /app/data/app.db
+    volumes:
+      - backend-data:/app/data   # SQLite(캐시·로그·프로필). 컨테이너를 다시 만들어도 유지됩니다.
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mcp
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: deploy/Dockerfile
+    env_file:
+      - path: ./frontend/config/.env
+        required: false
+    environment:
+      BACKEND_URL: http://backend:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      - backend
+
+volumes:
+  backend-data:

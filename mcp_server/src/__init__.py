@@ -1,1 +1,1 @@
-"""Weather MCP server package."""
+"""Elder care MCP server package."""

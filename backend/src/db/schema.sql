@@ -1,0 +1,1 @@
+-- cache, run_logs, profiles 테이블 — 상옥
