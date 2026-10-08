@@ -1,1 +1,1 @@
-"""Weather MCP server tests."""
+"""Elder care MCP server tests."""
