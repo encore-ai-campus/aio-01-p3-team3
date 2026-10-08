@@ -1,395 +1,692 @@
-# 어르신 날씨 안전 안내 멀티에이전트 계획서 (수정본 v2)
+# 🏠 바이탈·IoT·긴급대응 멀티 에이전트 기반 노인 케어 시스템
 
-> 원본: `multi_agent_safety_service_plan.md`. 바뀐 곳은 **[v2]** 로 표시했습니다.
+> 떨어져 사는 보호자가 어르신의 상태를 한눈에 확인하고, 긴급 상황에는 승인 한 번으로 대응하는 서비스
+> — 보호자 승인과 자가 복구(AutoHealing)를 갖춘 멀티 에이전트 케어 시스템
 
-## 1. 목표
+바이탈 사인, 집 안 IoT 기기, CCTV 캡처 이미지를 여러 에이전트가 나눠 살펴보고, 이상이 있으면 조치안을 만들어 **보호자에게 승인을 요청**합니다.
+보호자가 승인하면 에어컨 켜기·인덕션 끄기·119 호출 같은 조치를 실행합니다. 센서·기기·LLM에 장애가 나도 재시도·캐시·대체 경로로 스스로 복구하고, 끝까지 복구되지 않으면 보호자에게 직접 조치를 요청합니다.
 
-날씨, 사용자 취약도, 쉼터 정보를 바탕으로 어르신과 보호자에게 폭염·한파 안전 안내를 제공한다.
+> ⚠️ 이 프로젝트의 바이탈·기기·CCTV 데이터는 모두 **시연용 mock 데이터**이며, 위험 판정 기준은 **의학적 기준이 아닌 시연용 예시 규칙**입니다.
 
-> 위험도 판정은 일관성과 검증 가능성을 위해 코드가 담당하고, LLM은 판정 결과를 사람이 읽기 쉬운 문장으로 바꾼다.
+---
 
-이 서비스는 질병을 진단하거나 약 복용을 조언하지 않는다. 입력에 없는 장소, 거리, 운영시간, 기상 수치를 생성하지 않는다.
+## 목차
 
-## 2. 전체 구조
+1. [프로젝트 개요](#1-프로젝트-개요)
+2. [시스템 아키텍처](#2-시스템-아키텍처)
+3. [에이전트 흐름](#3-에이전트-흐름)
+4. [에이전트별 역할](#4-에이전트별-역할)
+5. [Guard·Validation·승인 단계](#5-guardvalidation승인-단계)
+6. [Handoff 데이터 형식](#6-handoff-데이터-형식)
+7. [AutoHealing (장애 감지·복구)](#7-autohealing-장애-감지복구)
+8. [Mock 데이터와 MCP 도구](#8-mock-데이터와-mcp-도구)
+9. [위험도 판정 규칙](#9-위험도-판정-규칙)
+10. [화면 구성 (보호자 대시보드)](#10-화면-구성-보호자-대시보드)
+11. [API 명세](#11-api-명세)
+12. [팀 구성과 역할](#12-팀-구성과-역할)
+13. [실행 방법](#13-실행-방법)
+14. [시연 시나리오와 장애 시험 결과](#14-시연-시나리오와-장애-시험-결과)
+15. [보안·개인정보 원칙](#15-보안개인정보-원칙)
 
-**[v2]** 입력은 오케스트레이터(지혜 님)가 Weather·Shelter·Profile 병렬 조사와 Join Guard를 거쳐 넘기는 `SafetyResearchResult`이다. 이 문서는 그 뒤 단계(LLM 파트)를 다룬다.
+---
 
-```text
-SafetyResearchResult (오케스트레이터)
-            |
-            v
- ProfileAgent (code) ----> vulnerability: 상 | 중 | 하
-            |
-            v
-   RiskAgent (code) ----> weather_stage, hazard, risk_level: 관심 | 주의 | 경고 | 위험
-            |
-            v
- HandoffGuard (code) ---> 관심이면 여기서 종료 (status: no_alert, LLM 호출 없음)   [v2: 위치 이동]
-            |
-            v
- WriterAgent (LLM) -----> actions[3], reason
-            |
-            v
- SummaryAgent (LLM) ----> elder_message, guardian_message
-            |
-            v
- ValidationAgent (code) -> 통과 / 실패 (실패 시 AutoHealing이 재요청 → 그래도 실패하면 Fallback)   [v2]
+## 1. 프로젝트 개요
+
+| 구분            | 내용                                                                                                                                                                                                   |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 과목 주제       | 에러 자가 치유(AutoHealing) 워크플로우                                                                                                                                                                 |
+| 서비스          | 노인 실시간 케어: 바이탈·실내 환경·CCTV 모니터링, 긴급 조치안 생성, 보호자 승인 후 조치 실행                                                                                                           |
+| **주요 사용자** | **떨어져 사는 노인 보호자** (자녀, 가족, 돌봄 담당자)                                                                                                                                                  |
+| 돌봄 대상       | 혼자 사는 어르신                                                                                                                                                                                       |
+| 핵심 원칙       | ① 기기 제어·119 호출 같은 조치는 **보호자 승인 후에만** 실행한다. ② 장애가 나도 조용히 멈추지 않고, 복구가 안 되면 **보호자에게 직접 알린다**. ③ 정보가 빠지면 더 보수적인 쪽(알리는 쪽)으로 판단한다. |
+
+### 해결하려는 문제
+
+- 보호자는 떨어져 살아서 어르신의 상태를 실시간으로 알기 어렵습니다.
+- 바이탈, 집 안 온습도, 가전 상태, CCTV를 각각 따로 확인해야 해서 놓치기 쉽습니다.
+- 위급 상황에서 무엇을 해야 할지 판단하고 실행하는 데 시간이 걸립니다.
+
+### 전체 흐름 한 문장
+
+> 보호자가 어르신을 선택하면, 바이탈·IoT(실내 온습도·기기·CCTV)·취약도를 병렬로 확인하고, 이상이 있을 때만 긴급상황 에이전트가 조치안을 만들어 보호자에게 승인을 요청하며, 승인되면 조치를 실행하고 결과를 보호자와 어르신에게 안내한다.
+
+### 역할을 나눈 이유
+
+- 바이탈, 집 안 기기, 프로필은 서로 독립적인 정보라 **병렬로 확인**하면 빠르고, 한쪽 센서가 고장 나도 나머지는 살릴 수 있습니다.
+- **판정(코드 규칙)**과 **조치안·문장 작성(LLM)**을 나눠서, 판단은 일관되고 검증 가능하게, 안내는 읽기 쉽게 만듭니다.
+- 사람의 판단이 필요한 조치는 **승인 단계**로 분리해서, 에이전트가 마음대로 기기를 끄거나 119에 전화하지 않게 합니다.
+
+---
+
+## 2. 시스템 아키텍처
+
+```
+ frontend 컨테이너          backend 컨테이너                     mcp 컨테이너
+┌──────────────┐        ┌───────────────────────┐          ┌────────────────────┐
+│  Streamlit   │──HTTP─▶│  FastAPI              │──MCP────▶│  MCP 서버            │
+│  보호자 대시보드 │        │  오케스트레이터            │          │  바이탈·IoT·CCTV·     │
+│  승인 버튼,    │◀───────│  + 승인 대기 관리          │          │  병원·알림 도구        │
+│  장애 주입     │        │  + AutoHealing        │          └────────┬───────────┘
+└──────────────┘        │        │              │                   │
+                        │        ▼              │                   ▼
+                        │  [SQLite] (볼륨)        │      mock_data.py, CCTV 이미지
+                        │  캐시, 실행 로그, 프로필    │      (비전 분석은 LLM API 호출)
+                        └────────┬──────────────┘
+                                 ▼
+                             [LLM API]
 ```
 
-에이전트는 자유롭게 판단하거나 토론하지 않는다. 앞 단계의 구조화된 결과만 받아 자기 역할의 결과만 반환하는 파이프라인형 멀티에이전트다.
+- 재시도·캐시 폴백은 backend의 AutoHealing에서 처리합니다. MCP 서버는 mock 데이터를 돌려주거나 기기 제어를 흉내 내고, 실패하면 예외를 그대로 던집니다.
+- 실제 센서·가전·119 연동은 하지 않습니다. 모든 조치는 **로그에 기록하는 mock 동작**입니다.
+- SQLite는 backend만 사용하며, 재배포해도 캐시가 남도록 Docker 볼륨에 저장합니다.
 
-## 3. 역할 분담
+| 구성요소   | 기술                                          | 역할                                                                          |
+| ---------- | --------------------------------------------- | ----------------------------------------------------------------------------- |
+| 프런트엔드 | Streamlit                                     | 보호자 대시보드, 진행 상황 한 줄 표시, 승인/거절, 장애 주입, 로그 표시        |
+| 백엔드     | FastAPI                                       | 오케스트레이터, 승인 대기 관리, `/care/run` `/care/approve` `/health` `/logs` |
+| 도구 계층  | MCP (FastMCP)                                 | 바이탈·실내 환경·기기·CCTV·병원·알림 도구 (mock)                              |
+| DB         | SQLite                                        | 캐시(복구 수단), 실행 로그(복구 증거), 테스트 프로필                          |
+| LLM        | (팀에서 사용하는 모델, 이미지 입력 지원 필요) | CCTV 이미지 분석, 조치안 문장, 보호자용·어르신용 안내                         |
+| 배포       | Docker Compose + GitHub Actions               | 컨테이너 3개, 테스트 실패 시 배포 차단                                        |
 
-| 컴포넌트 | 구현 | 책임 | 금지 사항 |
-| --- | --- | --- | --- |
-| ProfileAgent | 코드 | 사용자 정보로 취약도 계산 | 지병명 해석, LLM 판정 |
-| RiskAgent | 코드 | **[v2]** 기온·체감·특보로 날씨 단계 계산, 날씨 단계와 취약도로 위험도 판정 | LLM 응답으로 위험도 변경 |
-| HandoffGuard | 코드 | 알림 진행 여부 결정 (**[v2]** Writer 앞) | 위험도 자체 변경 |
-| WriterAgent | LLM | 행동요령 3개와 판정 근거 문장 생성 | 위험도 재판정, 의료 조언, 정보 창작 |
-| SummaryAgent | LLM | 어르신용/보호자용 안내문 재작성 | 입력에 없는 사실 추가 |
-| ValidationAgent | 코드 | JSON 구조와 안전 제약 검사 | **[v2]** 재시도 직접 구현 (AutoHealing 담당) |
-| FallbackAgent | 코드 | 재요청까지 실패 시 **[v2] 계절별** 템플릿 출력 | 새 수치나 장소 생성 |
+---
 
-**[v2] AutoHealing(상옥 님)에 넘기는 것**: 검증 함수 `validate_writer()`, `validate_summary()`, 필수 키 목록, 계절별 FALLBACK. 재요청 1회와 로그 기록은 AutoHealing의 `with_healing` 계층에서 감싼다.
+## 3. 에이전트 흐름
 
-## 4. 데이터 계약
+```
+                         START
+       (보호자가 어르신 선택 + 시연 시나리오 선택)
+                           │
+                  [Orchestration 1]
+                    Care Monitoring
+                           │
+                ┌──────────┼──────────┐
+                ▼          ▼          ▼
+             Vital        IoT       Profile
+             Agent       Agent       Agent
+          (바이탈 사인) (실내 온습도·  (취약 요인)
+                       기기 상태·
+                      CCTV 이미지 분석)
+                │          │          │
+                └──────────┼──────────┘
+                           ▼
+                Validation (PASS / RETRY / FAIL)
+                       Join Guard
+                       Aggregator
+                           │
+                    CareStatusResult
+                           │
+                     Handoff Guard
+                    (정상이면 종료)
+                           │
+                  [Orchestration 2]
+                    Emergency Response
+                           │
+                    Emergency Agent
+   (위험 판정 + 조치안: 기기 제어 / 보호자 알림 / 119 / 병원)
+          ※ 바이탈 + 온습도 + 기기 + CCTV 분석 결과를 함께 사용
+                           │
+                  ★ Approval Gate ★
+                    (보호자 승인)
+                  승인 ↙        ↘ 거절
+           Action 실행          조치 없이 기록
+   (IoT 제어, 알림·119 호출 — mock)
+                           │
+                     Summary Agent
+     (보호자용 결과 보고 + CCTV 캡처 / 어르신용 짧은 안내)
+                           │
+                     Write Result
+                           │
+                          END
+```
 
-**[v2] 값 표기**: 팀 전체가 쓰는 응답 값은 한글로 통일한다. 취약도 `상/중/하`, 위험도 `관심/주의/경고/위험`. (프런트 `COLORS`, 오케스트레이터 `vulnerability` 필드와 맞춤)
+**IoT Agent는 두 번 일합니다.** Orchestration 1에서는 실내 온습도·기기 상태·CCTV를 **읽고**, 승인 후에는 기기를 **제어**합니다. 실내 온습도와 CCTV는 별도 에이전트가 아니라 IoT Agent가 쓰는 도구입니다.
 
-### 4.1 공통 입력 (SafetyResearchResult 중 LLM 파트가 쓰는 부분)
+| 에이전트 흐름       | 시스템에서 하는 일                                                                   |
+| ------------------- | ------------------------------------------------------------------------------------ |
+| START               | Streamlit → FastAPI `POST /care/run`                                                 |
+| Vital / IoT Agent   | MCP 도구 호출 → mock 데이터, CCTV 이미지 비전 분석                                   |
+| Profile Agent       | SQLite 테스트 프로필 읽기                                                            |
+| Validation, Guard   | 판정 결과를 SQLite 실행 로그에 기록                                                  |
+| Emergency Agent     | 규칙으로 위험도 판정, LLM으로 조치안 문장 생성                                       |
+| Approval Gate       | `status: pending_approval` 반환 → 보호자가 화면에서 승인/거절 → `POST /care/approve` |
+| Action 실행         | MCP `control_device`, `notify_guardian`, `call_119` (mock)                           |
+| Summary Agent → END | LLM으로 안내문 생성 → Streamlit 결과 카드 표시                                       |
+
+---
+
+## 4. 에이전트별 역할
+
+| 에이전트            | 주요 역할                                                                                    | 제한사항                                                             | 주요 출력                                       |
+| ------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ----------------------------------------------- |
+| **Orchestrator**    | 호출 순서·병렬 실행, Guard 판단, 승인 대기 관리, task_id·시도 횟수 관리, 최종 성공·실패 판단 | 도구 직접 호출 금지, 위험도 직접 판정 금지, 승인 없이 조치 실행 금지 | 다음 경로, 실행 상태, `current_step`            |
+| **Vital Agent**     | 심박, 혈압, 체온, 산소포화도 조회                                                            | 진단 금지, 실패 시 예외를 그대로 던짐                                | 바이탈 수치, 측정 시각                          |
+| **IoT Agent**       | 실내 온습도·기기 상태 조회, CCTV 캡처 이미지 분석, 승인된 기기 제어                          | 승인 없는 기기 제어 금지, 이미지에 보이지 않는 내용 추측 금지        | 실내 환경, 기기 상태, CCTV 분석 결과, 제어 결과 |
+| **Profile Agent**   | 취약도(상/중/하) 계산                                                                        | 질병 진단 금지, 지병명 전달 금지                                     | 취약도                                          |
+| **Emergency Agent** | 규칙표로 위험도 판정(코드), 조치안 작성(LLM), 필요 시 가까운 병원 정보 첨부                  | 위험도를 LLM이 정하지 않음, 입력에 없는 수치·장소 생성 금지          | 위험도, 조치안 목록, 판정 근거                  |
+| **Summary Agent**   | 보호자용 결과 보고, 어르신용 짧은 안내 작성(LLM)                                             | 질병·약 조언 금지, 어르신용에 CCTV 이미지 포함 금지                  | guardian_message, elder_message                 |
+
+> **원칙: LLM은 판단하지 않고 전달만 한다.** 위험도 판정은 일관되고 검증 가능한 코드 규칙으로 처리하고, LLM은 이미지 설명·조치안 문장·안내문만 만듭니다.
+
+### Profile Agent
+
+```python
+def vulnerability(p):
+    score = 0
+    if p.get("age", 80) >= 75: score += 1
+    if p.get("lives_alone", True): score += 1
+    if p.get("has_condition", True): score += 1        # 지병 유무만 사용
+    if p.get("mobility_limited", True): score += 1     # 거동 불편 여부
+    return "상" if score >= 3 else "중" if score >= 2 else "하"
+```
+값이 없으면 위험한 쪽을 기본값으로 잡아 보수적으로 판단합니다.
+
+---
+
+## 5. Guard·Validation·승인 단계
+
+모든 Guard는 **LLM이 아닌 코드 규칙**으로 구현합니다.
+
+### Validation (에이전트 결과 개별 검사 → PASS / RETRY / FAIL)
+
+| 대상          | 검사 내용                                                                             | 실패 시                 |
+| ------------- | ------------------------------------------------------------------------------------- | ----------------------- |
+| Vital         | 값이 존재하고 측정 가능한 범위인가 (센서 오류값 걸러내기)                             | RETRY                   |
+| IoT 실내 환경 | 온도·습도가 측정 가능한 범위인가                                                      | RETRY                   |
+| CCTV 분석     | JSON 파싱, 필수 키(`person_visible`, `posture`, `fall_suspected`, `description`) 존재 | RETRY                   |
+| LLM 출력      | JSON 파싱, 필수 키 존재 여부                                                          | RETRY 1회 → 템플릿 대체 |
+
+- RETRY는 **최대 3회**(CCTV 분석은 2회), 넘으면 FAIL
+- FAIL이면 해당 정보 없이 진행하거나 안전 종료하고, 보호자에게 알린 뒤 로그에 기록
+
+### Join Guard (결과가 모두 모였는가)
+
+| 상황                          | 정책                                                                            |
+| ----------------------------- | ------------------------------------------------------------------------------- |
+| Vital 최종 실패 (캐시도 없음) | 안전 종료, 보호자에게 "센서 확인 필요" 알림                                     |
+| Vital 캐시 사용               | "n분 전 측정값"으로 표시하고 진행                                               |
+| IoT 상태 조회 실패            | 기기 정보 없이 진행, 보호자 화면에 "기기 상태 확인 불가" 표시                   |
+| CCTV 분석 실패                | "영상 판단 불가"로 표시하고 바이탈 기준으로만 판정, 캡처 원본은 보호자에게 표시 |
+| Profile 누락                  | 취약도 "상"으로 간주하고 진행                                                   |
+
+### Handoff Guard (Orchestration 2로 넘길 가치가 있는가)
+
+- 바이탈 정상 + 실내 환경 정상 + 기기 이상 없음 + 쓰러짐 의심 없음 → **"이상 없음"으로 종료**
+- 불필요한 알림을 막아 보호자의 "알림 피로"를 줄입니다.
+
+### Approval Gate (보호자 승인)
+
+| 항목                  | 내용                                                                       |
+| --------------------- | -------------------------------------------------------------------------- |
+| 승인이 필요한 조치    | 기기 제어(에어컨 켜기, 인덕션 끄기 등), 119 호출                           |
+| 승인 없이 하는 일     | 상태 확인, 위험도 판정, 보호자에게 승인 요청 보내기                        |
+| 승인 화면에 보여줄 것 | 위험도, 판정 근거, 조치안 목록, CCTV 캡처 + 한 문장 설명, 가까운 병원 정보 |
+| 승인                  | Action 실행 → Summary → 결과 보고                                          |
+| 거절                  | 조치 없이 "보호자 거절"로 기록 → Summary(보호자용 기록만)                  |
+
+---
+
+## 6. Handoff 데이터 형식
+
+### CareStatusResult (Orchestration 1 → 2)
 
 ```json
 {
   "task_id": "task-102",
-  "season": "winter",
-  "profile": {
-    "age": 78,
-    "lives_alone": true,
-    "has_condition": true,
-    "has_cooling": true,
-    "has_heating": false
+  "attempt": 1,
+  "scenario": "fall",
+  "vitals": { "hr": 118, "sbp": 100, "temp": 36.3, "spo2": 93, "measured_at": "10:42", "source": "live" },
+  "env": { "temp": 25, "humidity": 50 },
+  "devices": { "aircon": "off", "induction": "off" },
+  "cctv": {
+    "image_path": "assets/cctv/fall.jpg",
+    "person_visible": true,
+    "posture": "fallen",
+    "fall_suspected": true,
+    "description": "거실 바닥에 사람이 쓰러져 있는 것으로 보입니다."
   },
-  "weather": {
-    "max_temp": -4.0,
-    "min_temp": -13.0,
-    "min_temp_yesterday": -2.0,
-    "min_temp_tomorrow": -12.5,
-    "wind_ms": 4.0,
-    "feels_like": -20.3,
-    "warning": null,
-    "base": "20261007 0500"
-  },
-  "shelters": [
-    {"name": "OO 경로당", "address": "...", "distance_m": 320, "open": "09:00-18:00"}
+  "vulnerability": "상",
+  "errors": []
+}
+```
+> 지병명 원문은 넘기지 않고 `vulnerability`만, CCTV는 이미지 자체가 아니라 **파일 경로와 분석 결과만** 전달합니다.
+
+### EmergencyResult (Emergency Agent → Approval Gate)
+
+```json
+{
+  "risk_level": "위급",
+  "reason": "CCTV 쓰러짐 의심 + 심박 상승 + 산소포화도 저하",
+  "actions": [
+    { "type": "notify_guardian", "needs_approval": false },
+    { "type": "call_119", "needs_approval": true },
+    { "type": "hospital_info", "value": "○○병원 응급실 (1.2km)" }
   ]
 }
 ```
 
-**[v2] 바뀐 점**
-- `base`는 데이터·MCP와 같은 뜻(예보 발표 시각)으로만 쓴다. 판정 근거 문구는 RiskAgent가 만드는 `stage_label`로 분리.
-- `weather_stage`는 입력으로 받지 않고 RiskAgent가 계산한다.
-- `feels_like`, `wind_ms`, `min_temp_yesterday`, `min_temp_tomorrow`를 받는다 (한파 판정용).
-- 쉼터는 데이터·MCP 형식대로 리스트(최대 3곳)를 받는다.
-- `has_cooling_heating` 한 칸을 `has_cooling`, `has_heating` 두 칸으로 나눈다.
-
-`has_condition`은 지병 유무만 사용하며, 질병명은 저장하거나 프롬프트에 전달하지 않는다.
-
-### 4.2 ProfileAgent 출력
-
-```json
-{ "vulnerability": "상" }
-```
-
-```python
-def vulnerability(profile: dict, season: str) -> str:
-    score = 0
-    if profile.get("age", 80) >= 75:
-        score += 1
-    if profile.get("lives_alone", True):
-        score += 1
-    if profile.get("has_condition", True):
-        score += 1
-    # [v2] 계절에 맞는 설비만 본다
-    device = "has_heating" if season == "winter" else "has_cooling"
-    if not profile.get(device, False):
-        score += 1
-    return "상" if score >= 3 else "중" if score >= 2 else "하"
-```
-
-누락 정보는 보수적으로 처리한다.
-
-### 4.3 RiskAgent
-
-**[v2] ① 체감온도 (데이터·MCP와 공유할 함수)**
-
-```python
-def wind_chill(t: float, wind_ms: float) -> float:
-    # 기상청 겨울 체감온도식은 기온 10℃ 이하, 풍속 1.3m/s 이상에서만 쓴다.
-    if t > 10 or wind_ms < 1.3:
-        return t
-    v = wind_ms * 3.6
-    return 13.12 + 0.6215 * t - 11.37 * v**0.16 + 0.3965 * v**0.16 * t
-```
-
-원본 공식은 조건이 없어 -12℃·무풍이 +5.7℃로 계산됐다.
-
-**[v2] ② 날씨 단계 계산**
-
-기준값은 기상청 특보 기준을 바탕으로 한 초안이며, 코드 상수 한 곳(`STAGE_RULES`)에 둔다. 연동 전 기상청 최신 기준을 확인해 확정한다.
-
-| 단계 | 폭염 (hazard=heat) | 한파 (hazard=cold) |
-| --- | --- | --- |
-| severe | 폭염경보, 또는 체감 최고 35℃ 이상 | 한파경보, 또는 최저 -15℃ 이하 2일 지속, 또는 전날보다 15℃ 이상 하강하고 3℃ 이하 |
-| advisory | 폭염주의보, 또는 체감 최고 33℃ 이상 | 한파주의보, 또는 최저 -12℃ 이하 2일 지속, 또는 전날보다 10℃ 이상 하강하고 3℃ 이하 |
-| normal | 그 외 | 그 외 |
-
-- 특보(`warning`)가 있으면 특보가 우선, 없거나 특보 API 장애면 기온으로 자체 판정한다.
-- 기상청의 "평년보다 3℃ 낮음" 조건은 평년값 데이터가 없어 생략한다 (보수적으로 알림이 더 나가는 쪽).
-- `hazard`는 `season`으로 정한다 (`summer` → heat, `winter` → cold, 그 외 → 기온으로 판단).
-
-**③ 위험도 규칙표** (원본과 같음, 값만 한글)
-
-| 날씨 단계 | 취약도 하 | 취약도 중 | 취약도 상 |
-| --- | --- | --- | --- |
-| normal | 관심 | 관심 | 주의 |
-| advisory | 주의 | 경고 | 경고 |
-| severe | 경고 | 위험 | 위험 |
-
-출력:
-
-```json
-{
-  "hazard": "cold",
-  "weather_stage": "advisory",
-  "stage_label": "한파주의보 수준",
-  "risk_level": "경고",
-  "risk_reason": "한파주의보 수준 + 취약도 중"
-}
-```
-
-WriterAgent와 SummaryAgent는 `risk_level`을 읽기만 하며 변경할 권한이 없다.
-
-### 4.4 HandoffGuard **[v2: Writer 앞으로 이동]**
-
-| 위험도 | 응답 status | 다음 단계 |
-| --- | --- | --- |
-| 관심 | `no_alert` | 종료. LLM 호출 없음, 화면에 "알림 보내지 않음" |
-| 주의 | `alert` | Writer·Summary 진행 |
-| 경고 | `alert` | Writer·Summary 진행, 보호자 안부 전화 권고 |
-| 위험 | `alert` | Writer·Summary 진행, 보호자 안부 전화 권고, 화면 긴급 표시 |
-
-- 판단 기준은 `risk_level` 하나뿐이다. 원본의 "주의: 선택적 발송"은 동작이 정해져 있지 않아 `alert`로 확정했다.
-- 오케스트레이터 설계의 Guard 조건("특보 없음 + 체감 정상 + 취약도 하")을 이 기준으로 바꾸도록 지혜 님과 합의한다.
-
-### 4.5 쉼터 선택 **[v2 신규]**
-
-Writer에는 쉼터 1곳만 넘긴다. 코드에서 고른다.
-
-1. 지금 운영 중인 곳 중 가장 가까운 곳
-2. 운영 중인 곳이 없으면 가장 가까운 곳 + `shelter_open_now: false`
-3. 쉼터 리스트가 비었으면 `shelter: null`
-
-`shelter_open_now`가 false면 Writer는 "실내에 머무르기"를 우선 안내하고 쉼터는 운영 시작 시각과 함께 쓴다. 한파 위험은 새벽·아침에 크고 이때 경로당은 대부분 닫혀 있기 때문이다.
-
-### 4.6 WriterAgent 계약
-
-입력:
-
-```json
-{
-  "hazard": "cold",
-  "risk_level": "경고",
-  "stage_label": "한파주의보 수준",
-  "max_temp": -4.0,
-  "min_temp": -13.0,
-  "feels_like": -20.3,
-  "wind_ms": 4.0,
-  "shelter_name": "OO 경로당",
-  "distance_m": 320,
-  "open": "09:00-18:00",
-  "shelter_open_now": false
-}
-```
-
-필수 출력:
-
-```json
-{
-  "actions": ["새벽 외출을 줄이세요", "모자와 장갑을 하세요", "난방을 꼭 켜 두세요"],
-  "reason": "한파주의보 수준 추위와 중간 취약도가 확인되었습니다."
-}
-```
-
-Writer 프롬프트 규칙:
-
-- 행동요령은 정확히 3개, 각 항목은 20자 이내로 작성한다.
-- 어르신이 바로 할 수 있는 행동만 작성한다.
-- **[v2]** `hazard`에 맞는 행동만 쓴다. heat이면 수분·그늘·한낮 외출, cold이면 보온·난방·새벽 외출·빙판길.
-- **[v2]** 프롬프트에 hazard별 좋은 예시 1개씩을 넣는다.
-- 제공된 쉼터, 수치, 운영시간 외의 사실은 언급하지 않는다.
-- 질병 진단, 약 복용, 치료 조언을 하지 않는다.
-- JSON 객체만 반환한다.
-
-### 4.7 SummaryAgent 계약
-
-입력:
-
-```json
-{
-  "hazard": "cold",
-  "risk_level": "경고",
-  "actions": ["새벽 외출을 줄이세요", "모자와 장갑을 하세요", "난방을 꼭 켜 두세요"],
-  "shelter_name": "OO 경로당",
-  "distance_m": 320,
-  "stage_label": "한파주의보 수준"
-}
-```
-
-필수 출력:
-
-```json
-{
-  "elder_message": "오늘은 많이 춥습니다. 새벽에는 나가지 마시고 난방을 꼭 켜 두세요.",
-  "guardian_message": "위험도: 경고. 한파주의보 수준이며 OO 경로당이 약 320m 거리에 있습니다. 어르신께 안부 전화를 드려 주세요."
-}
-```
-
-Summary 프롬프트 규칙:
-
-- `elder_message`: 90자 이내, 존댓말과 쉬운 말 사용, 가장 중요한 행동 하나 강조.
-- `guardian_message`: 위험도, 이유, 추천 쉼터를 포함. 위험도가 경고 또는 위험이면 안부 전화를 권한다.
-- JSON 객체만 반환하고 입력에 없는 사실을 추가하지 않는다.
-
-### 4.8 최종 응답 (프런트로 가는 형식) **[v2 신규]**
-
-프런트 문서의 형식에 `hazard`, `fallback_used`를 더한다.
+### 응답 1: 승인 대기 (`POST /care/run`)
 
 ```json
 {
   "task_id": "task-102",
-  "status": "alert",
-  "hazard": "cold",
-  "risk_level": "경고",
-  "elder_message": "...",
-  "guardian_message": "...",
-  "fallback_used": false,
-  "data_source": "live",
-  "base": "20261007 0500",
+  "status": "pending_approval",
+  "current_step": "바이탈 확인 → IoT·CCTV 확인 → 위험 판정 완료 → 보호자 승인 대기",
+  "risk_level": "위급",
+  "reason": "CCTV 쓰러짐 의심 + 심박 상승 + 산소포화도 저하",
+  "actions": ["119 호출", "○○병원 응급실 정보 안내"],
+  "cctv": { "image_path": "assets/cctv/fall.jpg", "description": "거실 바닥에 사람이 쓰러져 있는 것으로 보입니다." },
   "logs": []
 }
 ```
 
-## 5. 검증과 Fallback
+### 응답 2: 최종 결과 (`POST /care/approve`)
 
-### 5.1 ValidationAgent 검사 항목
+```json
+{
+  "task_id": "task-102",
+  "status": "done",
+  "approved": true,
+  "current_step": "보호자 승인 → 119 호출(mock) 완료 → 안내 전송",
+  "risk_level": "위급",
+  "executed": [{ "action": "call_119", "result": "success" }],
+  "guardian_message": "어르신 댁 거실에서 쓰러짐이 의심되어 승인하신 대로 119에 연락했습니다. 가까운 응급실: ○○병원(1.2km).",
+  "elder_message": "곧 도움이 도착해요. 움직이지 말고 기다려 주세요.",
+  "logs": [{ "step": "vision", "attempt": 1, "status": "success" }]
+}
+```
+`status`: `no_issue` / `pending_approval` / `done` / `rejected` / `fail`
 
-Writer 결과:
+---
 
-- `actions`가 문자열 3개로 구성됐는가
-- 각 행동요령이 20자 이하인가
-- `reason`이 비어 있지 않은가
-- 쉼터명이 언급되었다면 입력 쉼터명과 일치하는가
-- 금지 의료 표현이 없는가
-- **[v2]** 숫자 검사는 기온(℃)과 거리(m)에만 적용한다. 입력에 없는 기온·거리 숫자가 있으면 실패. "오후 2~5시" 같은 시간대 표현은 허용한다.
+## 7. AutoHealing (장애 감지·복구)
 
-Summary 결과:
+### 장애 유형별 대응 (fault → retry → 마지막엔 fail)
 
-- `elder_message`, `guardian_message`가 모두 존재하는가
-- `elder_message`가 90자 이하인가
-- `guardian_message`에 위험도가 포함됐는가
-- **[v2]** 쉼터가 있을 때만 `guardian_message`에 쉼터명이 포함됐는지 검사한다 (쉼터 없음이 항상 실패로 가지 않게)
-- 경고, 위험에서 안부 전화 권고가 포함됐는가
+| ID           | 장애 상황                         | 감지 조건                    | 복구 전략                                                | 최종 실패 시                                                                         |
+| ------------ | --------------------------------- | ---------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| DR-VITAL-01  | 바이탈 센서 응답 없음             | 타임아웃, 값 누락            | 3회 재시도 → 마지막 측정값(캐시) 사용 + "n분 전 값" 표시 | 보호자에게 "센서 확인 필요" 알림                                                     |
+| DR-IOT-01    | 기기 제어 실패 (에어컨이 안 켜짐) | 제어 결과 실패, 상태 미변경  | 3회 재시도                                               | **FAIL** → 보호자에게 "직접 조치 필요" 알림                                          |
+| DR-VISION-01 | CCTV 이미지 분석 실패             | 응답 없음, JSON 형식 오류    | 2회 재시도                                               | "영상 판단 불가" 표시, 바이탈 기준으로만 판정, 보호자에게 원본 캡처로 직접 확인 요청 |
+| DR-LLM-01    | 조치안·안내문 출력 형식 오류      | JSON 파싱 실패, 필수 키 누락 | "JSON으로만 답하라" 1회 재요청 → 고정 템플릿 문구        | —                                                                                    |
 
-LLM의 JSON 파싱 실패, 필수 키 누락, 위 조건 위반은 모두 검증 실패로 처리한다.
+DR-IOT-01은 **"끝까지 복구가 안 되면 사람에게 넘긴다"**를 보여주는 시나리오입니다.
 
-### 5.2 재요청과 Fallback **[v2: 원본의 "재시도 없음, 즉시 템플릿" 변경]**
+### 재시도 + 캐시 폴백
 
-1. 검증 실패 → AutoHealing이 "JSON 형식으로만 답하라"를 덧붙여 **1회 재요청** (장애 시험 DR-LLM-01)
-2. 재요청도 실패 → 계절별 템플릿 사용, `fallback_used: true`
+```python
+def with_healing(cache_key, fetch, task_id, step, fault=None, retries=3, use_cache=True):
+    start = time.time()
+    for attempt in range(1, retries + 1):
+        try:
+            if fault == step:
+                raise TimeoutError("주입된 장애")
+            result = fetch()
+            if use_cache:
+                save_cache(cache_key, result)
+            log(task_id, step, attempt, "success", elapsed_ms=elapsed(start))
+            return {"data": result, "source": "live"}
+        except Exception as e:
+            log(task_id, step, attempt, "retry", error=str(e))
+            time.sleep(0.5 * attempt)
+
+    cached = load_cache(cache_key) if use_cache else None
+    if cached:
+        log(task_id, step, retries, "fallback", recovery="cache", elapsed_ms=elapsed(start))
+        return {"data": cached, "source": "cache"}
+
+    log(task_id, step, retries, "fail")
+    raise RuntimeError(f"{step} 복구 실패")
+```
+- 바이탈 조회: `use_cache=True` (마지막 측정값으로 대체)
+- 기기 제어: `use_cache=False` (제어는 캐시로 대신할 수 없으므로 실패 시 보호자에게 넘김)
+
+### LLM 실패 시 템플릿
 
 ```python
 FALLBACK = {
-    "heat": {
-        "actions": ["물을 자주 드세요", "한낮 외출을 줄이세요", "가까운 쉼터를 이용하세요"],
-        "elder_message": "오늘은 더위가 위험합니다. 무리하지 마시고 시원한 곳에서 쉬세요.",
-    },
-    "cold": {
-        "actions": ["새벽 외출을 줄이세요", "모자와 장갑을 하세요", "난방을 꼭 켜 두세요"],
-        "elder_message": "오늘은 추위가 위험합니다. 따뜻하게 입으시고 실내에 계세요.",
-    },
-    "guardian_message": "위험도 {risk_level}. 어르신께 안부 전화를 드려 주세요. 추천 쉼터: {shelter_name}",
+  "guardian_message": "어르신 상태 확인이 필요합니다. 위험도 {risk_level}. 판정 근거: {reason}. 화면에서 상세 내용을 확인해 주세요.",
+  "elder_message": "보호자에게 연락했어요. 편하게 계시고 무리하지 마세요."
 }
 ```
 
-`risk_level`, `shelter_name`은 코드에서 검증된 입력값으로 치환한다. 쉼터 데이터가 없을 때는 "추천 쉼터" 문장을 제거하고, 존재하지 않는 쉼터를 만들지 않는다.
+### SQLite 테이블
 
-## 6. 구현 순서
+```sql
+CREATE TABLE cache (
+  key TEXT PRIMARY KEY,      -- 예: vitals_person01
+  value TEXT,                -- JSON
+  saved_at TEXT
+);
 
-### 오늘 저녁: 결정 로직 완성
+CREATE TABLE run_logs (
+  task_id TEXT, step TEXT, attempt INT,
+  status TEXT,               -- success / retry / fallback / fail / approved / rejected
+  error TEXT, recovery TEXT, elapsed_ms INT, created_at TEXT
+);
+```
 
-1. `vulnerability()`, `wind_chill()`, 날씨 단계 계산, 위험도 규칙표를 순수 함수로 구현한다.
-2. ProfileAgent, RiskAgent, HandoffGuard 단위 테스트를 작성한다.
-3. Writer/Summary는 모의 JSON 응답으로 파이프라인을 연결한다.
+- `cache`: 장애 시 꺼내 쓰는 **복구 수단**
+- `run_logs`: 자동 복구율·평균 복구시간 계산과 승인 이력 기록에 쓰는 **복구 증거**
 
-### 내일 오전: LLM 연결과 안전장치
+### 장애 주입
 
-1. WriterAgent와 SummaryAgent에 낮은 temperature(0.0-0.3)와 JSON 출력 모드를 적용한다.
-2. 검증 함수, 필수 키, 계절별 FALLBACK을 AutoHealing에 넘겨 재요청 계층에 연결한다.
-3. 프런트·오케스트레이터와 한글 값, `hazard`, `status` 형식을 맞춘다.
+실제로 무언가를 끊지 않고 **코드에서 일부러 예외를 던지는 방식**으로 시연합니다.
 
-### 내일 오후: 품질과 시연
+| 옵션     | 동작                                     |
+| -------- | ---------------------------------------- |
+| `vital`  | 바이탈 조회 시 TimeoutError 발생         |
+| `iot`    | 기기 제어 시 실패 반환                   |
+| `vision` | CCTV 분석 시 깨진 응답 반환              |
+| `llm`    | 조치안·안내문 응답 대신 깨진 문자열 반환 |
 
-1. 안내 문장을 다듬고 글자 수를 확인한다.
-2. 입력값, 취약도, 위험도, 행동요령, 대상별 요약문을 한 화면에 표시한다.
-3. LLM 장애 주입 시 재요청 → fallback 화면이 정상적으로 보이는지 여름·겨울 모두 확인한다.
+### 복구 지표
 
-## 7. 테스트 시나리오 **[v2: 기대값을 하나로 고정, 한파 케이스 추가]**
+- **자동 복구율** = 수동 개입 없이 정상 결과까지 전달된 장애 시나리오 수 ÷ 전체 장애 시나리오 수 × 100
+- **평균 복구시간** = 자동 복구 성공 시나리오의 복구시간 합계 ÷ 자동 복구 성공 건수
 
-LLM이 들어가는 시나리오는 5회 반복해 JSON 구조와 문장 제약을 검사한다.
+```sql
+SELECT AVG(elapsed_ms) FROM run_logs WHERE status = 'fallback';
+```
 
-| 시나리오 | 고정 입력 | 기대 코드 판정 | 추가 확인 |
-| --- | --- | --- | --- |
-| 폭염 고위험 | 여름, 체감 35℃, 취약도 상 | severe → 위험 | 쉼터 허위 생성 없음 |
-| 한파 중위험 | 겨울, 최저 -13/-12.5℃ (2일), 취약도 중 | advisory → 경고 | 의료 조언 없음, 여름 문구 없음 |
-| 한파 급강하 | 겨울, 전날 최저 8℃ → 오늘 -3℃, 취약도 하 | advisory → 주의 | |
-| 바람 없는 한파 | 기온 -12℃, 풍속 0 | 체감 -12℃ (+5.7℃ 아님) | `wind_chill` 회귀 테스트 |
-| 새벽, 쉼터 닫힘 | 겨울 05시, 한파경보, 쉼터 운영 전 | severe → 위험 이상, `alert` | "실내에 머무르기" 안내 |
-| 쉼터 없음 | 쉼터 리스트 비어 있음 | 판정 그대로 | 검증 통과, 쉼터 문장 없음 |
-| 가을 저위험 | 가을, 18℃, 취약도 하 | normal → 관심 | `no_alert`, LLM 호출 0회 |
-| LLM 장애 (겨울) | fault=llm, 한파 | 판정 그대로 | 재요청 1회 후 겨울용 fallback |
+---
 
-공통 검사: Writer의 `actions`는 3개이며, Summary의 필수 키가 존재하고 어르신용 문장은 90자 이하다.
+## 8. Mock 데이터와 MCP 도구
 
-## 8. 발표용 설명
+### mock_data.py
 
-"안전 서비스에서는 위험도 판정이 매번 같고 검증 가능해야 하므로, 취약도·날씨 단계·위험도는 코드 규칙으로 계산했습니다. 위험이 없는 날은 LLM을 부르지 않고 끝납니다. LLM은 판정 권한 없이 확정된 결과를 어르신과 보호자가 이해하기 쉬운 문장으로 전달하고, 형식이 깨지면 한 번 다시 요청한 뒤에도 실패하면 계절에 맞는 고정 문구로 대신해 모델 오류가 나도 최소 안전 안내가 전달됩니다."
+시나리오별 데이터를 파이썬 파일 하나에 넣고, MCP 도구는 이 값을 읽기만 합니다.
 
-## 9. 팀 합의 필요 사항 **[v2 신규]**
+```python
+SCENARIOS = {
+  "normal":   {"vitals": {"hr": 72,  "sbp": 125, "temp": 36.5, "spo2": 98},
+               "env": {"temp": 24, "humidity": 50}, "devices": {"aircon": "off", "induction": "off"},
+               "cctv": "assets/cctv/normal.jpg"},
+  "heat":     {"vitals": {"hr": 105, "sbp": 140, "temp": 37.8, "spo2": 96},
+               "env": {"temp": 33, "humidity": 75}, "devices": {"aircon": "off", "induction": "off"},
+               "cctv": "assets/cctv/normal.jpg"},
+  "induction":{"vitals": {"hr": 80,  "sbp": 130, "temp": 36.6, "spo2": 97},
+               "env": {"temp": 26, "humidity": 55}, "devices": {"aircon": "off", "induction": "on(2h)"},
+               "cctv": "assets/cctv/kitchen_empty.jpg"},
+  "fall":     {"vitals": {"hr": 118, "sbp": 100, "temp": 36.3, "spo2": 93},
+               "env": {"temp": 25, "humidity": 50}, "devices": {"aircon": "off", "induction": "off"},
+               "cctv": "assets/cctv/fall.jpg"},
+  "critical": {"vitals": {"hr": 140, "sbp": 85,  "temp": 36.0, "spo2": 88},
+               "env": {"temp": 25, "humidity": 50}, "devices": {"aircon": "off", "induction": "off"},
+               "cctv": "assets/cctv/lying.jpg"},
+}
+```
+> 수치는 시연용 가상값입니다.
 
-수정본 중 다른 파트와 맞물리는 항목이다. 합의되면 `상태`를 바꾸고 본문에 반영한다.
+### MCP 도구
 
-### 9.1 바뀐 점과 이유
+| MCP 도구                                 | 사용 에이전트 | 역할                                                         |
+| ---------------------------------------- | ------------- | ------------------------------------------------------------ |
+| `get_vitals(person_id)`                  | Vital         | 바이탈 조회                                                  |
+| `get_indoor_env(home_id)`                | IoT           | 실내 온습도                                                  |
+| `get_device_status(home_id)`             | IoT           | 기기 상태                                                    |
+| `capture_cctv(home_id)`                  | IoT           | CCTV 캡처 이미지 경로 반환 (시나리오별로 미리 준비한 이미지) |
+| `analyze_cctv(image_path)`               | IoT           | 이미지를 LLM(비전)에 넣어 상황 판단                          |
+| `control_device(device, action)`         | IoT (승인 후) | 에어컨 켜기, 인덕션 끄기 등 (mock)                           |
+| `find_hospital(area)`                    | Emergency     | 가까운 병원 정보 (mock 목록)                                 |
+| `notify_guardian(msg)` / `call_119(msg)` | Action 실행   | 알림·호출 (실제 전송 없이 로그만)                            |
 
-| # | 바뀐 점 | 이유 |
-| --- | --- | --- |
-| 1 | 체감온도 공식에 적용 조건 추가 (기온 10℃ 이하, 풍속 1.3m/s 이상) | 조건이 없으면 바람 없는 -12℃가 체감 +5.7℃로 계산돼 한파 알림이 안 나감 |
-| 2 | 날씨 단계를 RiskAgent에서 직접 계산 | 계산 담당이 없었고, 한파 판정에 전날 최저기온과 2일 지속 여부가 필요함 |
-| 3 | 냉방·난방을 `has_cooling` / `has_heating`으로 분리 | 한 칸이면 난방이 부족한 분이 겨울에 덜 취약하게 나옴 |
-| 4 | LLM 대체 문구를 여름용/겨울용으로 분리 | 기존 문구의 "물을 자주 드세요"가 한파 날에도 나감 |
-| 5 | 응답에 `hazard`(heat/cold) 추가 | 화면과 보호자 문구에 위험 원인을 표시하기 위해 |
-| 6 | 한파 테스트 기대값을 하나로 고정 | "위험 또는 경고"로는 테스트 통과·실패를 판단할 수 없음 |
+### CCTV 이미지 분석
 
-### 9.2 파트별 확인 질문
+CCTV 캡처처럼 보이는 이미지를 시나리오별로 미리 준비해 두고, `analyze_cctv`가 이미지 입력을 지원하는 LLM에 넣어 상황을 판단합니다.
 
-| 담당 | 질문 | 관련 절 | 상태 |
-| --- | --- | --- | --- |
-| 지혜 (오케스트레이터) | Handoff Guard를 위험도 계산 직후로 옮기고, 기준을 "위험도 관심이면 종료" 하나로 바꿔도 되는가? | 2, 4.4 | 미정 |
-| 지혜 (오케스트레이터) | 위험도 '주의'도 `alert`로 처리해도 되는가? | 4.4 | 미정 |
-| 상옥 (AutoHealing) | LLM 재요청 1회는 `with_healing`에서 감싸고, LLM 파트는 검증 함수·필수 키·계절별 대체 문구만 넘기는 것이 맞는가? | 3, 5.2 | 미정 |
-| 상옥 (AutoHealing) | 응답에 `fallback_used`를 추가해도 되는가? | 4.8 | 미정 |
-| 두나 (데이터·MCP) | `get_weather` 출력에 `min_temp_yesterday`, `min_temp_tomorrow`를 추가할 수 있는가? | 4.1 | 미정 |
-| 두나 (데이터·MCP) | 체감온도 함수에 적용 조건을 넣어 줄 수 있는가? | 4.3 ① | 미정 |
-| 두나 (데이터·MCP) | `base`는 예보 발표 시각 뜻으로만 쓰고, 판정 문구는 `stage_label`로 분리해도 되는가? | 4.1 | 미정 |
-| 수언 (프런트) | 위험도·취약도 값을 한글(관심/주의/경고/위험, 상/중/하)로 유지하는 것이 맞는가? | 4 | 미정 |
-| 수언 (프런트) | `hazard` 값으로 폭염/한파 표시를 넣을 수 있는가? | 4.8 | 미정 |
-| 수언 (프런트) | 계절 선택에 "봄·가을"을 추가할 수 있는가? (시연 장면 2번용) | 7 | 미정 |
+**준비할 이미지** (`assets/cctv/`)
+
+| 파일                | 장면                                      |
+| ------------------- | ----------------------------------------- |
+| `normal.jpg`        | 거실에 어르신이 앉아 있음                 |
+| `kitchen_empty.jpg` | 주방에 사람 없음 (인덕션 켜짐 시나리오용) |
+| `fall.jpg`          | 바닥에 쓰러져 있음                        |
+| `lying.jpg`         | 침대나 소파에 누워 움직임 없음            |
+
+실제 CCTV 영상이나 모르는 사람의 사진은 쓰지 않고, 팀원이 연출해 찍은 사진이나 일러스트를 사용합니다. 화면 위쪽에 날짜·시각과 `CAM 01` 같은 글씨를 넣고 흑백·저화질로 바꿔 CCTV 캡처처럼 만듭니다.
+
+**프롬프트**
+```
+너는 어르신 돌봄용 CCTV 화면을 확인하는 도우미다.
+이미지에 보이는 것만 근거로 판단한다. 보이지 않는 것은 추측하지 않는다.
+아래 JSON 형식으로만 답한다.
+
+{"person_visible": true/false,
+ "posture": "standing" | "sitting" | "lying" | "fallen" | "none",
+ "fall_suspected": true/false,
+ "description": "보호자에게 보여줄 한 문장 설명"}
+```
+
+**결과 사용**
+- `fall_suspected: true`면 바이탈과 상관없이 위험도를 **위급**으로 올립니다.
+- 승인 화면과 보호자용 결과에 **캡처 이미지 + 한 문장 설명**을 함께 보여줘서, 보호자가 눈으로 확인하고 승인할 수 있게 합니다.
+- 판단은 "의심" 수준으로만 표현하고 확진처럼 쓰지 않습니다.
+
+---
+
+## 9. 위험도 판정 규칙
+
+위험도는 **정상 / 주의 / 경고 / 위급** 4단계이며, Emergency Agent가 코드 규칙으로 판정합니다.
+
+> 아래 기준은 **시연용 예시 규칙**이며 의학적 기준이 아닙니다. 팀에서 확정한 값을 이 표에 기록합니다.
+
+### 판정 순서
+
+| 우선순위 | 조건                                                            | 위험도                        |
+| -------- | --------------------------------------------------------------- | ----------------------------- |
+| 1        | CCTV 쓰러짐 의심, 또는 바이탈 중 2개 이상이 위험 범위           | 위급                          |
+| 2        | 바이탈 1개가 위험 범위, 또는 실내 고온·저온 + 바이탈 변화       | 경고                          |
+| 3        | 실내 환경 이상만 있음, 또는 사람이 없는데 가전이 오래 켜져 있음 | 주의                          |
+| 4        | 이상 없음                                                       | 정상 (Handoff Guard에서 종료) |
+
+취약도 "상"이면 위험도를 한 단계 올립니다 (최대 "위급").
+
+### 위험 원인별 조치안
+
+| 원인                          | 조치안                        | 승인 필요 |
+| ----------------------------- | ----------------------------- | --------- |
+| 실내 고온                     | 에어컨 켜기                   | ✅         |
+| 사람 없음 + 인덕션 켜짐·과열  | 인덕션 끄기                   | ✅         |
+| 바이탈 이상                   | 보호자 알림, 가까운 병원 정보 | 알림은 ❌  |
+| 쓰러짐 의심, 바이탈 다수 이상 | 119 호출, 응급실 정보         | ✅         |
+
+---
+
+## 10. 화면 구성 (보호자 대시보드)
+
+```
+┌──────────────────────────────────────────────────┐
+│ 진행: 바이탈 확인 → IoT·CCTV 확인 → 위험 판정 → 승인 대기   │  ← 한 줄 진행 표시
+├──────────────────────────────────────────────────┤
+│ 사이드바                                              │
+│  - 어르신 선택 (테스트 인물)                             │
+│  - 시나리오 선택 (normal / heat / induction / fall …)   │
+│  - 장애 주입: □ 바이탈 □ IoT □ CCTV 분석 □ LLM           │
+│  - [상태 확인하기] 버튼                                  │
+├────────────────┬────────────────┬────────────────┤
+│ ❤️ 바이탈 카드     │ 🏠 실내·기기 카드    │ 📷 CCTV 캡처       │
+│ 심박·혈압·체온·SpO2│ 온습도, 에어컨·인덕션 │ 이미지 + 분석 한 문장 │
+├────────────────┴────────────────┴────────────────┤
+│ 🚨 위험도: 위급 (빨강)  판정 근거: …                       │
+│ 조치안: 119 호출 / ○○병원 응급실 정보                      │
+│            [ 승인 ]   [ 거절 ]                          │
+├──────────────────────────────────────────────────┤
+│ ✅ 실행 결과 / 보호자용 보고 / 어르신 안내 미리보기            │
+├──────────────────────────────────────────────────┤
+│ 🔧 실행 과정 (AutoHealing 로그)                          │
+│ vital 1회차 실패 → 2회차 실패 → 캐시 사용 ✅                │
+└──────────────────────────────────────────────────┘
+```
+
+| 위험도 | 정상 | 주의 | 경고 | 위급 |
+| ------ | ---- | ---- | ---- | ---- |
+| 색상   | 초록 | 노랑 | 주황 | 빨강 |
+
+**안내 문구 기준**
+- 보호자용(주 사용자): 위험도, 판정 근거, 실행한 조치와 결과, CCTV 설명, 병원 정보, 필요한 다음 행동
+
+---
+
+## 11. API 명세
+
+| Method | Endpoint        | 설명                                                                        |
+| ------ | --------------- | --------------------------------------------------------------------------- |
+| POST   | `/care/run`     | 모니터링 → 위험 판정 → 조치안 생성. 조치가 필요하면 `pending_approval` 반환 |
+| POST   | `/care/approve` | 보호자 승인/거절 처리 → 조치 실행 → 결과 반환                               |
+| GET    | `/health`       | 서버 상태 확인                                                              |
+| GET    | `/logs`         | 최근 실행 기록 조회                                                         |
+
+**`POST /care/run` 요청 예시**
+
+```json
+{
+  "person": "profile-01",
+  "scenario": "fall",
+  "fault": ["vision"]
+}
+```
+
+**`POST /care/approve` 요청 예시**
+
+```json
+{
+  "task_id": "task-102",
+  "approved": true
+}
+```
+
+---
+
+## 12. 팀 구성과 역할
+
+| 담당           | 이름 | 맡은 부분                                                                                                                | 산출물                               |
+| -------------- | ---- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------ |
+| 팀장 · PM      | 기화 | 기획, 일정 관리, 문서 총괄, 발표, 시나리오 5개 확정, CCTV 시연 이미지 준비 / 개발 전반 지원                              | 산출물 3종 취합·검토, 발표자료, 발표 |
+| 오케스트레이터 | 지혜 | FastAPI, 에이전트 흐름 연결, Validation·Join·Handoff Guard, Approval Gate 백엔드(승인 대기 저장, `/care/approve` API), CareStatusResult 스키마 | 멀티 에이전트 아키텍처 설계서        |
+| AutoHealing    | 상옥 | 재시도·캐시 폴백·템플릿 대체, 장애 주입(`vital`, `iot`, `vision`, `llm`), SQLite(캐시·로그), 복구 지표 계산              | 배포 및 장애 복구 보고서             |
+| 데이터·MCP     | 두나 | `mock_data.py`, MCP 도구 9개 (해든이 만든 CCTV 분석 함수를 `analyze_cctv` 도구로 등록), **승인 화면** (`approval.py`: 위험도·조치안·CCTV 캡처 표시, 승인/거절 버튼, `/care/run` → `/care/approve` 2단계 호출, 승인 대기 상태 관리) | 설계서 중 도구 부분                  |
+| LLM 에이전트   | 해든 | 취약도 계산, 위험도 규칙표, Emergency 조치안 프롬프트, Summary 프롬프트, 템플릿 문구, **CCTV 분석 전체** (분석 함수, 비전 모델 호출, CCTV 분석 프롬프트, 분석 결과 JSON 형식 정의) | 설계서 중 에이전트 역할·CCTV 분석 부분 |
+| 프런트엔드     | 수언 | 보호자 대시보드 레이아웃(메인 화면, 두나의 `approval.py`를 불러와 배치), 진행 한 줄 표시, 바이탈·기기·CCTV 카드, 로그 화면, 시연 영상 (UI 먼저 → 기능 연결) | 파이프라인 보고서, 시연 영상         |
+
+### 팀원 간 합의 사항
+
+| 누구와 누구                  | 합의할 것                                                                                          |
+| ---------------------------- | -------------------------------------------------------------------------------------------------- |
+| PM ↔ 전체                    | 일정, 산출물 담당·마감, 시나리오 목록, 문서와 실제 구현이 일치하는지 확인                          |
+| 오케스트레이터 ↔ 전체        | CareStatusResult, EmergencyResult, `/care/run`·`/care/approve` 요청·응답 형식, `current_step` 문구 |
+| 데이터·MCP ↔ AutoHealing     | 도구 함수 이름과 반환 형식, 실패 시 예외 그대로 던지기                                             |
+| AutoHealing ↔ 오케스트레이터 | `source`(live/cache) 표시, 최종 실패 시 예외로 알리기                                              |
+| LLM ↔ 데이터·MCP             | CCTV 분석 함수 이름·입출력 형식, MCP 서버 안 파일 위치 (해든은 분석 함수, 두나는 도구 등록만), 사용할 LLM 모델과 키 설정 |
+| LLM ↔ 오케스트레이터         | CCTV 분석 결과 JSON 형식 (CareStatusResult의 `cctv` 필드)                                          |
+| LLM ↔ AutoHealing            | 필수 키 목록, 템플릿 문구                                                                          |
+| 승인 화면(두나) ↔ 오케스트레이터 | 승인 대기 응답 형식(`pending_approval`), 승인/거절 요청 형식                                   |
+| 프런트 ↔ 승인 화면(두나)     | `approval.py` 함수 이름과 넘겨줄 값, 화면 배치·스타일 통일 (같은 Streamlit 파일을 함께 고치지 않기) |
+| 프런트 ↔ 오케스트레이터      | `current_step` 표시 방식, CCTV 이미지 경로를 화면에 표시하는 방법                                  |
+| 프런트 ↔ AutoHealing         | 장애 주입 옵션 이름(`vital`, `iot`, `vision`, `llm`), 로그 표시 형식                               |
+
+---
+
+## 13. 실행 방법
+
+```bash
+# 1. 저장소 받기
+git clone <저장소 URL>
+cd <저장소 폴더>
+
+# 2. 환경변수 설정 (서비스별 config/.env, 깃에 올리지 않습니다)
+cp frontend/config/.env.example frontend/config/.env
+cp backend/config/.env.example backend/config/.env
+cp mcp_server/config/.env.example mcp_server/config/.env
+# backend/config/.env와 mcp_server/config/.env에 OPENAI_API_KEY 또는 GEMINI_API_KEY 입력
+# (mcp_server는 CCTV 이미지 분석에 LLM을 사용합니다)
+
+# 3. 실행 (루트 compose.yml로 컨테이너 3개를 한 번에 띄웁니다)
+docker compose up --build
+```
+
+| 서비스    | 주소                                         |
+| --------- | -------------------------------------------- |
+| Streamlit | http://localhost:8501                        |
+| FastAPI   | http://localhost:8000 (`/docs`에서 API 확인) |
+| MCP 서버  | http://localhost:8010/mcp                    |
+
+**Compose 파일 구분**
+
+| 파일                                           | 용도                                                             |
+| ---------------------------------------------- | ---------------------------------------------------------------- |
+| `compose.yml` (루트)                           | 로컬 통합 실행용. 서비스 3개, 공용 네트워크, backend SQLite 볼륨 |
+| `frontend/deploy/compose.yml` 등 서비스별 파일 | 배포용. GitHub Actions가 서비스별로 빌드·배포                    |
+
+**주요 환경변수**
+
+| 파일                     | 변수                                | 비고                                                                                                       |
+| ------------------------ | ----------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `frontend/config/.env`   | `BACKEND_URL`                       | 루트 compose에서는 `http://backend:8000`으로 자동 설정                                                     |
+| `backend/config/.env`    | `WEATHER_MCP_URL`                   | MCP 서버 주소. 루트 compose에서는 `http://mcp:8010/mcp`로 자동 설정 (변수명은 코드 수정 시 함께 변경 예정) |
+| `backend/config/.env`    | `OPENAI_API_KEY` / `GEMINI_API_KEY` | 사용하는 LLM의 키 하나                                                                                     |
+| `backend/config/.env`    | `DB_PATH`                           | compose에서 `/app/data/app.db`로 자동 설정                                                                 |
+| `mcp_server/config/.env` | `OPENAI_API_KEY` / `GEMINI_API_KEY` | CCTV 이미지 분석용 (이미지 입력 지원 모델)                                                                 |
+
+배포 서버에서는 같은 변수를 각 서비스 폴더의 `.env.docker`에 넣습니다.
+
+> 장애 시험 전에는 정상 실행을 한 번 해서 바이탈 캐시를 채워 두세요. 캐시가 비어 있으면 폴백이 동작하지 않습니다.
+
+---
+
+## 14. 시연 시나리오와 장애 시험 결과
+
+> 장애 시험 결과는 실제로 수행한 결과만 기록합니다.
+
+### 시연 시나리오
+
+| 순서 | 시나리오    | 보여줄 장면                                                                                                                    |
+| ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| 1    | `normal`    | 모두 정상 → Handoff Guard에서 종료, "이상 없음"                                                                                |
+| 2    | `heat`      | 실내 고온 + 바이탈 변화 → 에어컨 켜기 조치안 → 보호자 승인 → 에어컨 켜짐                                                       |
+| 3    | `induction` | CCTV에 주방이 비어 있음 + 인덕션 온도가 너무 높음 → 인덕션 끄기 승인                                                           |
+| 4    | `fall`      | **CCTV 이미지를 LLM이 분석해 쓰러짐 의심 판단** → 위급 → 캡처와 함께 보호자 승인 요청 → 119 호출(mock)                         |
+| 5    | 장애 주입   | `iot` 장애 → 재시도 3회 → FAIL → 보호자에게 "직접 조치 필요" / `vision` 장애 → 바이탈 기준으로 판정 후 원본 이미지로 확인 요청 |
+
+4번에서는 화면에 **캡처 이미지 → LLM 분석 결과(한 문장) → 위험도 상승 → 승인 요청**이 한 흐름으로 보이게 합니다.
+
+### 시험 기록표
+
+| Scenario ID  | 주입 장애             | 기대 동작                                                         | 실제 동작 | 복구 시간 | 수동 개입 | 판정 | 증빙 |
+| ------------ | --------------------- | ----------------------------------------------------------------- | --------- | --------- | --------- | ---- | ---- |
+| DR-VITAL-01  | 바이탈 센서 응답 없음 | 3회 재시도 → 캐시 사용 → "n분 전 값"으로 정상 진행                |           |           |           |      |      |
+| DR-IOT-01    | 기기 제어 실패        | 3회 재시도 → FAIL → 보호자에게 "직접 조치 필요"                   |           |           |           |      |      |
+| DR-VISION-01 | CCTV 분석 실패        | 2회 재시도 → "영상 판단 불가" → 바이탈 기준 판정 + 원본 확인 요청 |           |           |           |      |      |
+| DR-LLM-01    | LLM 출력 형식 오류    | 1회 재요청 → 템플릿 → 정상 안내                                   |           |           |           |      |      |
+
+### 지표
+
+| 지표          | 값  |
+| ------------- | --- |
+| 자동 복구율   |     |
+| 평균 복구시간 |     |
+
+---
+
+## 15. 보안·개인정보 원칙
+
+- API 키는 `.env`에만 저장하고 저장소에 올리지 않습니다. (`.gitignore`에 `.env`, `.env.docker` 포함)
+- 시연용 프로필은 **가상 인물**만 사용합니다.
+- CCTV 시연 이미지는 **팀원이 연출해 찍은 사진이나 일러스트**만 사용합니다.
+- 로그에는 CCTV 이미지 자체가 아니라 **파일 경로와 분석 결과만** 기록합니다.
+- CCTV 이미지는 보호자 화면에서만 보여주고, 어르신용 안내에는 넣지 않습니다.
+- 지병명 원문은 다음 단계로 넘기거나 로그에 남기지 않고, **취약도(상/중/하)만** 전달합니다.
+- LLM은 질병 진단이나 약 복용 조언을 하지 않으며, CCTV 판단은 "의심" 수준으로만 표현합니다.
+- 기기 제어와 119 호출은 **보호자 승인 없이 실행하지 않습니다.**
+- 모든 실행에는 `task_id`를 붙여 로그로 추적합니다.
+
+---
+
+## 실행 정보
+
+| 항목                | 링크 |
+| ------------------- | ---- |
+| 배포 URL            |      |
+| 저장소 URL          |      |
+| 파이프라인 실행 URL |      |
+| 시연 영상           |      |
