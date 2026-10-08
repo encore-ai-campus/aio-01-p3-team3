@@ -4,6 +4,8 @@
 > 코드 안에서는 `grep -rn "팀 합의" backend/src mcp_server/src`로 같은 내용을 찾을 수 있습니다.
 > 모든 기준값은 **시연용 예시**이며 의학적 기준이 아닙니다.
 >
+> 10/8 변경: **main 문서(`docs/scenarios.md` 개정판) 판정 기준에 맞춤**. 위험 범위 = NEWS2 3점, 작은 변화(1~2점)도 그 축 주의, 실내 이상 28℃ 초과/20℃ 미만, 실내 극한 31℃ 초과/18℃ 미만(경고). 문서 5장·8장 기대값과 같음. **단 하나 다른 점: critical도 119는 보호자 승인 요청**(해든 결정, 문서 2-4장 VITAL_SEVERE 자동 연결은 `ENABLE_AUTO_119 = False`로 끔).
+>
 > 10/8 변경: **main 스키마 연결**. `schemas.py`의 CareStatusResult(`vital.heart_rate`, `indoor_environment.temperature_c`, `devices.air_conditioner`, `induction` + `induction_minutes`, `cctv.status`)를 그대로 `evaluate()`/`run_emergency()`에 넘겨도 됩니다. `rules/risk.py`의 `normalize_care_status()`가 확정안 형식으로 바꿉니다. 확인: `backend/tests/test_schema_input.py`.
 >
 > 10/8 변경: **CCTV 판단 방식**. 비전 LLM은 "낙상인가"를 판단하지 않고 보이는 사실 4개(사람 보임, 몸이 닿은 곳 바닥/가구, 몸 모양 서기/앉기/눕기, 사진 선명)만 답합니다. 자세·낙상 의심은 `mcp_server/src/vision/analyzer.py`의 `FACT_RULES` 표가 정합니다. CCTV 낙상 의심이면 위급이고, 승인 알림에 캡처(`notify_guardian.value.cctv_image`)를 붙여 보호자가 사진을 보고 119를 승인합니다. CCTV 판단 불가면 원본 캡처 확인을 요청합니다.

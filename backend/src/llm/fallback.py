@@ -20,6 +20,7 @@
 #   기기 실패면 어르신께 솔직하게 말하고 직접 하실 일 안내(ELDER_TIP), 119 안내에 "구급대가 오고 있어요" 안심 한 마디.
 #
 # [팀 합의] 상옥 님: LLM 재요청까지 실패하면 AutoHealing이 이 함수 결과를 쓰고 fallback_used = true로 기록.
+# 2026-10-08 해든 (main 문서 개정판): 119 자동 연결 알림(emergency_alert_message)에도 CCTV 캡처 안내를 붙임 (DR-VISION-01 원본 캡처 확인).
 
 # 승인 화면·안내문에 쓰는 조치 이름. 각 30자 이내 (Emergency action_texts 길이 제한과 같음).
 # [팀 합의] 기화 님: README 5장 "거절 → 보호자용 기록만"과 다름. 거절돼도 어르신이 아무 말도 못 듣고 혼자 남지 않게
@@ -94,8 +95,11 @@ AUTO_119_WHY = {"ELDER_NO_RESPONSE": "어르신이 워치 확인에 응답하지
 
 
 # [팀 합의] 지혜 님·두나 님: 119를 승인 없이 연결한 직후 보호자에게 바로 보내는 알림 (LLM 기다리지 않음).
-def emergency_alert_message(reason: str, auto_reason: str, hospital: str | None = None) -> str:
-    text = f"[긴급] {AUTO_119_WHY.get(auto_reason, '위급 상황이라')} 119에 바로 연락했습니다. 판정 근거: {reason}."
+def emergency_alert_message(reason: str, auto_reason: str, hospital: str | None = None,
+                            actions: list[dict] | None = None) -> str:
+    note = next((a["value"].get("cctv_check") for a in actions or [] if a["type"] == "notify_guardian"), None)
+    cctv = f" {CCTV_CHECK_TEXT[note]}" if note in CCTV_CHECK_TEXT else ""
+    text = f"[긴급] {AUTO_119_WHY.get(auto_reason, '위급 상황이라')} 119에 바로 연락했습니다. 판정 근거: {reason}.{cctv}"
     if hospital:
         text += f" 가까운 응급실: {hospital}."
     return text + " 지금 바로 어르신께 전화하세요."

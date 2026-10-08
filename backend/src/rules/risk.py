@@ -42,12 +42,17 @@
 #     CCTV 판단 불가면 원본 캡처 확인 요청 (확정안 DR-VISION-01).
 #   - 워치 확인(ENABLE_WATCH_CHECK)과 119 바로 연결(ENABLE_AUTO_119)은 끔. 확정안은 119를 모두 보호자 승인 뒤에 검.
 #   - 위험 범위 안쪽의 작은 바이탈 변화만 있으면 정상 (확정안 판정 순서 4). 변화는 "실내 이상 + 바이탈 변화 → 경고"에만 씀
-#     (VITAL_CHANGE_ALONE_RAISES = False). 예: 심박 95만 있으면 예전엔 주의, 지금은 정상.
+#     (VITAL_CHANGE_ALONE_RAISES = False). 예: 심박 95만 있으면 예전엔 주의, 그때는 정상. → 아래 main 문서 개정판에서 다시 True.
 # 2026-10-08 해든 (main 스키마 연결): main의 schemas.py(CareStatusResult)와 키 이름이 달라 normalize_care_status()를 넣음.
 #   - vital.heart_rate/systolic_bp/temperature_c/spo2 → vitals.hr/sbp/temp/spo2, indoor_environment.temperature_c → env.temp
 #   - devices.air_conditioner → aircon, induction + induction_minutes(+ induction_temperature) → 구조 {"state","minutes","temperature"}
 #   - cctv.status(analyzed/unavailable/failed) → available, 숫자 confidence → "high"/"low", fall_event.voice_response → watch_response
 #   - 확정안 형식(vitals/env/구조 기기)으로 오면 그대로 둠. evaluate()와 Emergency Agent 입구에서 한 번 부름.
+# 2026-10-08 해든 (main 문서 docs/scenarios.md 개정판에 맞춤): 팀 문서가 "판정은 risk.py를 따른다"로 바뀌며 NEWS2 기준을 적음.
+#   - 위험 범위 = NEWS2 3점 (VITAL_DANGER_FROM_NEWS2 = True, 예전 확정안 범위 VITAL_DANGER는 남겨 둠)
+#   - 실내 이상 28℃ 초과 / 20℃ 미만, 실내 극한 31℃ 초과 / 18℃ 미만 → 경고 (ENABLE_ENV_EXTREME = True)
+#   - 작은 바이탈 변화(1~2점)도 그 축 주의 (VITAL_CHANGE_ALONE_RAISES = True)
+#   - 단, 해든 결정으로 critical도 119는 보호자 승인 (문서 2-4장 VITAL_SEVERE 자동 연결은 끔, ENABLE_AUTO_119 = False). 워치 확인도 계속 끔.
 #
 # 모든 수치는 시연용 예시 규칙이며 의학적 기준이 아님. 발표 전 출처(NEWS2, 질병관리청, WHO) 원문 확인.
 # 팀원과 겹치는 부분에는 "# [팀 합의] 이름: 설명" 주석을 달았음. 검색: grep -n "팀 합의" risk.py
@@ -69,12 +74,14 @@ VITAL_LABEL = {"hr": "심박", "sbp": "수축기 혈압", "temp": "체온", "spo
 # 위험 범위(3점) = 시연 시나리오 확정안 2장 (아래값, 위값). 이 값보다 낮거나 높으면 위험 범위. None이면 그쪽은 보지 않음.
 #   VITAL_BANDS의 3점은 이 범위 밖이라 쓰이지 않고, 범위 안쪽은 최대 2점(바이탈 변화)까지만 준다.
 VITAL_DANGER = {"hr": (50, 110), "sbp": (90, 160), "temp": (35.5, 37.5), "spo2": (94, None)}
+# 10/8 오후 docs/scenarios.md(main) 2-1장: 위험 범위 = NEWS2 3점. True면 위 VITAL_DANGER 대신 NEWS2 점수를 그대로 씀.
+VITAL_DANGER_FROM_NEWS2 = True
 
 # 실내 온도. "이상"은 확정안 2장(30℃ 이상 고온, 16℃ 이하 저온). "극한"은 [D4] 해든 안이었지만 확정안에 없어 끔.
-INDOOR_HOT, INDOOR_COLD = 30.0, 16.0          # 30℃ 이상 / 16℃ 이하 → 실내 이상
+INDOOR_HOT, INDOOR_COLD = 28.0, 20.0          # docs/scenarios.md 2-2장: 28℃ 초과 / 20℃ 미만 → 실내 이상
 # [팀 합의] 기화 님: 실내 극한을 경고로 올릴지. 켜려면 True로 하고 아래 값을 고온·저온 기준보다 바깥으로 정해 주세요.
-ENABLE_ENV_EXTREME = False
-INDOOR_EXTREME_HOT, INDOOR_EXTREME_COLD = 33.0, 13.0
+ENABLE_ENV_EXTREME = True                      # docs/scenarios.md 2-2장: 실내 극한 → 경고
+INDOOR_EXTREME_HOT, INDOOR_EXTREME_COLD = 31.0, 18.0   # 31℃ 초과 / 18℃ 미만
 
 # 에어컨 목표 온도 = 그 달 쾌적 범위 (해든 결정 10/8). 고온이면 상한, 저온이면 하한으로 맞춘다.
 COMFORT_SUMMER = (24, 26)   # 4~10월
@@ -104,6 +111,7 @@ UPRIGHT = {"standing", "sitting"}
 
 # [팀 합의] 기화 님·지혜 님: README 핵심 원칙 ①("119는 보호자 승인 후에만")에 예외를 둠. 합의 전이면 False로 두면 예전과 같음.
 # 해든 10/8: 확정안("119는 보호자 승인 후")에 맞춰 끔. 승인 대기 60초 뒤 자동 연결(on_timeout)은 그대로.
+# 해든 10/8 오후: docs/scenarios.md 2-4장은 VITAL_SEVERE 자동 연결이지만, 해든 결정으로 119는 모두 보호자 승인 (critical도 승인 요청).
 ENABLE_AUTO_119 = False
 # 바이탈만으로 바로 연결(VITAL_SEVERE). 확정안 critical 시나리오는 "119 호출 승인" 장면이라 끔. 워치 무응답 바로 연결은 그대로.
 ENABLE_AUTO_119_VITAL = False
@@ -123,7 +131,7 @@ HEATING_DEVICE = "aircon"
 
 # 위험 범위 안쪽의 작은 변화(NEWS2 1~2점)만 있을 때 주의로 올릴지. 확정안 판정 순서에는 없어서 False (해든 10/8).
 #   False여도 "실내 고온·저온 + 바이탈 변화 → 경고"(ENV_WITH_VITAL)에는 변화를 씀.
-VITAL_CHANGE_ALONE_RAISES = False
+VITAL_CHANGE_ALONE_RAISES = True     # docs/scenarios.md 2-3장: 심박·혈압 등 1~2점 → 그 축 주의
 VITAL_CHANGE_CODES = {"CARDIO_CHANGE", "RESP_CHANGE", "BODY_TEMP_CHANGE"}
 
 # 바이탈 항목 → 판정 축
@@ -226,6 +234,8 @@ def vital_score(name: str, value: float | None) -> int | None:
     """항목 하나의 0~3점. 값이 없으면 None."""
     if value is None:
         return None
+    if VITAL_DANGER_FROM_NEWS2:
+        return _news2_score(name, value)
     low, high = VITAL_DANGER[name]
     if (low is not None and value < low) or (high is not None and value > high):
         return 3
@@ -259,9 +269,9 @@ def indoor_state(temp: float | None) -> str:
         return "extreme_hot"
     if ENABLE_ENV_EXTREME and temp < INDOOR_EXTREME_COLD:
         return "extreme_cold"
-    if temp >= INDOOR_HOT:
+    if temp > INDOOR_HOT:
         return "hot"
-    if temp <= INDOOR_COLD:
+    if temp < INDOOR_COLD:
         return "cold"
     return "normal"
 

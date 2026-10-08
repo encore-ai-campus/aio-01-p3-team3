@@ -11,6 +11,7 @@
 # 2026-10-08 해든 (워치 버튼): 스피커 확인 이름을 워치 버튼 확인(watch_check, watch_response)으로 바꿈.
 # 2026-10-08 해든 (시연 시나리오 확정안): SCENARIOS를 확정안 4장 값으로 바꿈(기기 구조 형식, fall 바이탈은 심박만 위험).
 #   경계값을 확정안 2장 위험 범위·실내 30℃/16℃로 바꾸고, 확정안 5장·8장 기대값 테스트(test_demo_*)를 추가.
+# 2026-10-08 해든 (main 문서 개정판): docs/scenarios.md 2·5·8장 기준(NEWS2, 실내 28/20·극한 31/18)으로 기대값을 바꿈. critical 119는 해든 결정으로 승인 요청.
 # 2026-10-08 해든 (확정안과 다른 부분 정리): 시연 설정에서 워치 확인을 꺼서 fall 조치가 확정안대로 3개(119·응급실·알림).
 
 import pytest
@@ -41,7 +42,7 @@ SCENARIOS = {
                   "env": {"temp": 26, "humidity": 55},
                   "devices": {"aircon": {"state": "off"}, "induction": {"state": "on", "minutes": 120, "temperature": 300}},
                   "cctv": CCTV_EMPTY},
-    "fall": {"vitals": {"hr": 118, "sbp": 120, "temp": 36.4, "spo2": 95},      # 심박만 위험 범위
+    "fall": {"vitals": {"hr": 118, "sbp": 120, "temp": 36.4, "spo2": 96},      # 심박 변화만 (2점) 범위
              "env": {"temp": 25, "humidity": 50}, "devices": OFF, "cctv": CCTV_FALL},
     "critical": {"vitals": {"hr": 140, "sbp": 85, "temp": 36.0, "spo2": 88},
                  "env": {"temp": 25, "humidity": 50}, "devices": OFF, "cctv": CCTV_LYING},
@@ -74,7 +75,7 @@ def test_demo_profiles_vulnerability():
     ("induction", "profile-03", True, "주의"),
     ("induction", "profile-01", True, "경고"),   # 주의 → 보정
     ("fall", "profile-03", True, "위급"),        # CCTV
-    ("fall", "profile-03", False, "경고"),       # CCTV 분석 실패 → 바이탈 1개
+    ("fall", "profile-03", False, "주의"),       # CCTV 분석 실패 → 심박 변화만
     ("critical", "profile-01", False, "위급"),   # CCTV 분석 실패 → 바이탈 3개
     ("fall", "profile-01", True, "위급"),
     ("critical", "profile-01", True, "위급"),
@@ -86,19 +87,33 @@ def test_demo_expected_levels(name, profile, cctv_ok, level):
     assert evaluate(c, month=8)["risk_level"] == level
 
 
-@pytest.mark.parametrize("name, profile, actions", [
-    ("normal", "profile-01", []),
-    ("heat", "profile-02", ["control_device", "hospital_info", "notify_guardian"]),
-    ("induction", "profile-03", ["control_device", "notify_guardian"]),
-    ("fall", "profile-01", ["call_119", "hospital_info", "notify_guardian"]),
-    ("critical", "profile-01", ["call_119", "hospital_info", "notify_guardian"]),
+@pytest.mark.parametrize("name, profile, actions, auto", [
+    ("normal", "profile-01", [], None),
+    ("heat", "profile-02", ["control_device", "notify_guardian"], None),
+    ("induction", "profile-03", ["control_device", "notify_guardian"], None),
+    ("fall", "profile-01", ["call_119", "hospital_info", "notify_guardian"], None),
+    ("critical", "profile-01", ["call_119", "hospital_info", "notify_guardian"], None),   # 해든 결정: 문서와 달리 승인 요청
 ])
-def test_demo_expected_actions(name, profile, actions):
-    """확정안 5장 조치안과 같음. 119는 모두 승인 필요(바로 연결 아님)."""
+def test_demo_expected_actions(name, profile, actions, auto):
+    """docs/scenarios.md 5장 조치안. 119·기기 제어는 모두 승인 필요 (critical 자동 연결은 해든 결정으로 끔)."""
     r = evaluate(care(name, vulnerability(PROFILES[profile])), month=8)
     assert types(r) == actions
-    assert r["auto_119"] is None
-    assert all(a["needs_approval"] for a in r["actions"] if a["type"] in ("call_119", "control_device"))
+    assert r["auto_119"] == auto
+    for a in r["actions"]:
+        if a["type"] == "control_device" or (a["type"] == "call_119" and not auto):
+            assert a["needs_approval"] is True
+        if a["type"] == "call_119" and auto:
+            assert a["needs_approval"] is False
+
+
+def test_demo_section8_extra_cases():
+    """docs/scenarios.md 8장: 과열만으로 방치, CCTV 실패·바이탈 캐시. 119 자동 연결은 해든 결정으로 끔."""
+    dev = {"aircon": {"state": "off"}, "induction": {"state": "on", "minutes": 30, "temperature": 300}}
+    assert evaluate(care("induction", "하", devices=dev), month=8)["risk_level"] == "주의"
+    no_cctv = evaluate(care("critical", "상", cctv={"available": False}), month=8)
+    assert (no_cctv["risk_level"], no_cctv["auto_119"]) == ("위급", None)
+    cached = evaluate(care("critical", "상", vitals={**SCENARIOS["critical"]["vitals"], "source": "cache"}), month=8)
+    assert (cached["risk_level"], cached["auto_119"]) == ("위급", None)
 
 
 # 1. README 시나리오 5개 (계획서 1장 검산표, 취약도 중 기준)
@@ -144,11 +159,13 @@ def test_run_profile_returns_level_only():
 
 # 3. 경계값
 @pytest.mark.parametrize("name, value, score", [
-    # 위험 범위(3점) = 확정안 2장, 그 안쪽 변화(1~2점) = NEWS2
-    ("hr", 90, 0), ("hr", 91, 1), ("hr", 110, 1), ("hr", 111, 3), ("hr", 50, 1), ("hr", 49, 3),
-    ("spo2", 96, 0), ("spo2", 95, 1), ("spo2", 94, 1), ("spo2", 93, 3),
-    ("sbp", 111, 0), ("sbp", 110, 1), ("sbp", 100, 2), ("sbp", 90, 2), ("sbp", 89, 3), ("sbp", 160, 0), ("sbp", 161, 3),
-    ("temp", 37.5, 0), ("temp", 37.6, 3), ("temp", 36.0, 1), ("temp", 35.5, 1), ("temp", 35.4, 3),
+    # docs/scenarios.md 2-1장: NEWS2 점수 그대로 (3점 = 위험 범위)
+    ("hr", 90, 0), ("hr", 91, 1), ("hr", 110, 1), ("hr", 111, 2), ("hr", 130, 2), ("hr", 131, 3),
+    ("hr", 51, 0), ("hr", 50, 1), ("hr", 41, 1), ("hr", 40, 3),
+    ("spo2", 96, 0), ("spo2", 95, 1), ("spo2", 94, 1), ("spo2", 93, 2), ("spo2", 92, 2), ("spo2", 91, 3),
+    ("sbp", 111, 0), ("sbp", 110, 1), ("sbp", 100, 2), ("sbp", 91, 2), ("sbp", 90, 3), ("sbp", 219, 0), ("sbp", 220, 3),
+    ("temp", 38.0, 0), ("temp", 38.1, 1), ("temp", 39.1, 2), ("temp", 40.0, 3),
+    ("temp", 36.1, 0), ("temp", 36.0, 1), ("temp", 35.1, 1), ("temp", 35.0, 3),
     ("hr", None, None),
 ])
 def test_vital_score_boundaries(name, value, score):
@@ -156,8 +173,9 @@ def test_vital_score_boundaries(name, value, score):
 
 
 @pytest.mark.parametrize("temp, state", [
-    (29.9, "normal"), (30, "hot"), (40, "hot"),      # 실내 극한은 확정안에 없어 끔 (ENABLE_ENV_EXTREME)
-    (16.1, "normal"), (16, "cold"), (5, "cold"), (None, "normal"),
+    # docs/scenarios.md 2-2장: 이상 28℃ 초과 / 20℃ 미만, 극한 31℃ 초과 / 18℃ 미만
+    (28, "normal"), (28.1, "hot"), (31, "hot"), (31.1, "extreme_hot"),
+    (20, "normal"), (19.9, "cold"), (18, "cold"), (17.9, "extreme_cold"), (None, "normal"),
 ])
 def test_indoor_boundaries(temp, state):
     assert indoor_state(temp) == state
@@ -172,14 +190,14 @@ def test_induction_minutes(status, minutes):
     assert induction_on_minutes(status) == minutes
 
 
-def test_indoor_abnormal_alone_is_caution():      # 확정안 판정 순서 3
-    assert evaluate(care("normal", env={"temp": 33}), month=8)["risk_level"] == "주의"
+def test_indoor_abnormal_alone_is_caution():      # docs/scenarios.md 2-3장 environment 축
+    assert evaluate(care("normal", env={"temp": 33}), month=8)["risk_level"] == "경고"   # 극한
     assert evaluate(care("normal", env={"temp": 30}), month=8)["risk_level"] == "주의"
-    assert evaluate(care("normal", env={"temp": 29}), month=8)["risk_level"] == "정상"
+    assert evaluate(care("normal", env={"temp": 28}), month=8)["risk_level"] == "정상"
 
 
 def test_indoor_with_vital_change_is_warning():   # 확정안 판정 순서 2
-    c = care("normal", env={"temp": 33}, vitals={"hr": 95, "sbp": 125, "temp": 36.5, "spo2": 98})
+    c = care("normal", env={"temp": 30}, vitals={"hr": 95, "sbp": 125, "temp": 36.5, "spo2": 98})
     assert evaluate(c, month=8)["risk_level"] == "경고"
 
 
@@ -193,7 +211,7 @@ def test_induction_overheat_without_long_time():
 # 4. 조치 선택
 def test_heat_actions_aircon_cool_to_comfort_top():
     r = evaluate(care("heat"), month=9)
-    assert types(r) == ["control_device", "hospital_info", "notify_guardian"]
+    assert types(r) == ["control_device", "notify_guardian"]
     assert r["actions"][0]["value"] == {"device": "aircon", "mode": "cool", "target": 26}
     assert r["actions"][0]["needs_approval"] is True
 
@@ -255,19 +273,21 @@ def test_risk_level_ignores_info_only_causes():
 
 
 def test_reason_text_for_fallback():
-    assert evaluate(care("fall"), month=8)["reason"] == "CCTV 쓰러짐 의심 + 심박·혈압 위험 범위 + 산소포화도 변화"
+    assert evaluate(care("fall"), month=8)["reason"] == "CCTV 쓰러짐 의심 + 심박·혈압 변화"
 
 
 def test_heat_reason_has_body_temp_and_indoor():
     r = evaluate(care("heat"), month=8)
-    assert r["reason"] == "체온 위험 범위 + 실내 온도 이상(바이탈 변화 동반) + 심박·혈압 변화"
-    assert "hospital_info" in types(r)      # 확정안 5장: heat 조치에 병원 정보
+    assert r["reason"].startswith("실내 온도 극한")       # docs/scenarios.md 5장: 실내 온도 극한 + 심박·혈압 변화
+    assert "심박·혈압 변화" in r["reason"]
+    assert "hospital_info" not in types(r)  # 위험 범위(3점) 바이탈이 없어 병원 정보 없음
 
 
 def test_demo_settings_follow_final_plan():
-    """확정안과 다르게 갔던 해든 확장 설계는 시연에서 꺼 둠 (코드는 남김, tests/test_fall_cases.py가 켜고 확인)."""
+    """docs/scenarios.md: 워치 확인은 끔(fall_event 제외), CCTV 의심은 위급. 119 자동 연결은 해든 결정으로 끔."""
     import src.rules.risk as risk
-    assert risk.ENABLE_WATCH_CHECK is False and risk.ENABLE_AUTO_119 is False and risk.CCTV_SUSPECT_IS_CRITICAL is True
+    assert risk.ENABLE_WATCH_CHECK is False and risk.CCTV_SUSPECT_IS_CRITICAL is True
+    assert risk.ENABLE_AUTO_119 is False and risk.VITAL_DANGER_FROM_NEWS2 is True and risk.ENABLE_ENV_EXTREME is True
 
 
 @pytest.mark.parametrize("cctv", [

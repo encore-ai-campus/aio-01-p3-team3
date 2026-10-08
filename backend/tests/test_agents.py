@@ -11,6 +11,7 @@
 # 2026-10-08 해든 (축 정리): fall 근거 문장이 축별 원인으로 바뀜.
 # 2026-10-08 해든 (워치 버튼): 스피커 확인 이름을 워치 버튼 확인(watch_check, watch_response)으로 바꿈.
 # 2026-10-08 해든 (확정안과 다른 부분 정리): 시연 설정에서 워치 확인을 꺼서 fall 조치가 확정안대로 3개(119·응급실·알림).
+# 2026-10-08 해든 (main 문서 개정판): docs/scenarios.md 기준(NEWS2, fall SpO2 96)으로 기대값을 바꿈.
 
 import json
 
@@ -81,7 +82,7 @@ def test_fall_result_shape():
     assert [a["type"] for a in em["actions"]] == ["call_119", "hospital_info", "notify_guardian"]
     assert em["actions"][1]["value"] == HOSPITAL
     assert em["actions"][0]["needs_approval"] is True
-    assert em["reason"] == "CCTV 쓰러짐 의심 + 심박·혈압 위험 범위 + 산소포화도 변화"
+    assert em["reason"] == "CCTV 쓰러짐 의심 + 심박·혈압 변화"
 
 
 def test_hospital_failure_drops_hospital_action():
