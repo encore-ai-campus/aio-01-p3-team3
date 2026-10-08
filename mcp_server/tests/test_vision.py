@@ -4,6 +4,7 @@
 # 2026-10-08 해든: 빈 파일에 테스트를 넣음 (가짜 비전 LLM, 키 없이 돌아감). 계획서 8.8-7과 애매한 장면 보정.
 # 2026-10-08 해든 (CCTV 판단 방식 변경): LLM 답이 "보이는 사실 4개"로 바뀌어 raw()와 보정 테스트를 다시 씀.
 #   사실 → 자세·낙상 의심 표(FACT_RULES)는 test_fact_rules에서 확정안 이미지 4장 장면으로 확인.
+# 2026-10-08 해든 (두나 님 tools/cctv.py 연결): confidence 숫자로, 두나 님 analyze_cctv 도구 검증 통과 테스트 2개 추가.
 
 import base64
 import json
@@ -12,6 +13,7 @@ import pytest
 
 from src.vision.analyzer import (
     UNAVAILABLE_TEXT,
+    CONFIDENCE,
     analyze_cctv_or_unavailable,
     encode_image,
     make_vision_llm,
@@ -72,7 +74,7 @@ def test_good_output_passes():
 ])
 def test_fact_rules(shape, support, clear, posture, fall, confidence):
     out = facts_to_result({"person_visible": True, "body_support": support, "body_shape": shape, "image_clear": clear})
-    assert (out["posture"], out["fall_suspected"], out["confidence"]) == (posture, fall, confidence)
+    assert (out["posture"], out["fall_suspected"], out["confidence"]) == (posture, fall, CONFIDENCE[confidence])
 
 
 def test_not_visible_is_none():       # kitchen_empty.jpg
@@ -167,3 +169,19 @@ def test_openai_vision_sends_image_and_strict_schema(image):
     content = client.kwargs["input"][0]["content"]
     assert content[1]["type"] == "input_image" and content[1]["image_url"].startswith("data:image/")
     assert client.kwargs["text"]["format"]["strict"] is True
+
+
+# 두나 님 tools/cctv.analyze_cctv 검증(숫자 confidence, bool person_visible, status)을 통과하는지
+def test_dunas_cctv_tool_accepts_analyzer_output(image, monkeypatch):
+    from src.tools import cctv
+    from src.vision import analyzer
+    monkeypatch.setattr(analyzer, "make_vision_llm", lambda *a, **k: FakeVision(raw(body_shape="horizontal", body_support="floor",
+                                                                              description="거실 바닥에 누워 있는 것으로 보입니다.")))
+    out = cctv.analyze_cctv(image)
+    assert out["status"] == "analyzed" and out["posture"] == "fallen" and out["confidence"] == 0.9
+
+
+def test_dunas_cctv_tool_accepts_unavailable(tmp_path):
+    from src.tools import cctv
+    out = cctv.analyze_cctv(str(tmp_path / "none.jpg"))
+    assert out["status"] == "unavailable" and out["person_visible"] is False and out["available"] is False

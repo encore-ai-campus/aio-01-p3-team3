@@ -12,6 +12,8 @@
 #
 # [팀 합의] 두나 님: tools/cctv.py의 analyze_cctv(image_path)에서 analyze_cctv_or_unavailable(image_path)를 부르면 됨.
 #   mcp_server/requirements/runtime.txt에 openai(또는 google-genai)와 pillow, config/.env.example에 OPENAI_API_KEY 추가가 필요.
+# 2026-10-08 해든 (두나 님 tools/cctv.py 연결): confidence를 "high"/"low" 대신 0~1 숫자(0.9/0.4)로, status(analyzed/unavailable) 추가,
+#   판단 불가일 때 person_visible을 None 대신 False로 (두나 님 analyze_cctv 검증이 bool·숫자를 요구). 판단 불가 여부는 status·available로 봄.
 
 import base64
 import io
@@ -131,15 +133,19 @@ FACT_RULES = {
 }
 
 
+# 두나 님 tools/cctv.py와 schemas.py CctvAnalysis 계약: confidence는 0~1 숫자, status는 analyzed/unavailable/failed.
+CONFIDENCE = {"high": 0.9, "low": 0.4}
+
+
 def facts_to_result(facts: dict) -> dict:
     """LLM이 본 사실 → README cctv 형식 (person_visible, posture, fall_suspected, confidence)."""
     visible, support, shape = facts["person_visible"], facts["body_support"], facts["body_shape"]
     if not visible or shape == "none" or support == "none":
         return {"person_visible": False, "posture": "none", "fall_suspected": False,
-                "confidence": "high" if facts["image_clear"] else "low"}
+                "confidence": CONFIDENCE["high" if facts["image_clear"] else "low"]}
     posture, fall = FACT_RULES[(shape, support)]
     sure = facts["image_clear"] and "unclear" not in (shape, support)
-    return {"person_visible": True, "posture": posture, "fall_suspected": fall, "confidence": "high" if sure else "low"}
+    return {"person_visible": True, "posture": posture, "fall_suspected": fall, "confidence": CONFIDENCE["high" if sure else "low"]}
 
 
 # ---------- 검증 ----------
@@ -190,13 +196,13 @@ def analyze_cctv_image(image_path: str, llm: VisionLLM, errors: list[str] | None
     data, problems = validate_cctv(raw)
     if problems:
         raise CCTVOutputError(problems)
-    return {"image_path": str(image_path), "available": True, **data}
+    return {"image_path": str(image_path), "available": True, "status": "analyzed", **data}
 
 
 def unavailable(image_path: str, reason: str = "") -> dict:
     """README Join Guard: "영상 판단 불가"로 표시하고 바이탈 기준으로만 판정. 캡처 원본은 보호자에게 보여줌."""
-    return {"image_path": str(image_path), "available": False, "person_visible": None, "posture": "none",
-            "fall_suspected": False, "confidence": "low", "description": UNAVAILABLE_TEXT, "error": reason}
+    return {"image_path": str(image_path), "available": False, "status": "unavailable", "person_visible": False,
+            "posture": "none", "fall_suspected": False, "confidence": 0.0, "description": UNAVAILABLE_TEXT, "error": reason}
 
 
 # 임시: 상옥 님 재시도(with_healing)가 붙기 전까지 쓰는 함수.
