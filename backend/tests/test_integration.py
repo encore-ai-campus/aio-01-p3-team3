@@ -12,6 +12,7 @@
 #
 # [팀 합의] 지혜 님: 아래 care_run / care_approve 순서대로 해든 함수를 부르면 됩니다. 응답 키는 README 6장 응답 1·2와 같음.
 # [팀 합의] 두나 님: FakeTools의 함수 이름·인자·반환 형식이 실제 MCP 도구와 같아야 합니다. 다르면 알려 주세요.
+# 2026-10-08 해든 (main 문서 개정판): 기대값을 docs/scenarios.md로. critical 119는 해든 결정으로 승인 요청 유지, 자동 연결 알림에도 캡처 안내.
 
 import pytest
 
@@ -135,7 +136,7 @@ def care_run(tools, task_id, month=8):
     auto = next((a for a in em["actions"] if a.get("auto")), None)
     if auto:                                # 정말 위급: 승인 없이 바로 119 → 긴급 알림 → 결과
         executed = [x for x in (execute(tools, a, em) for a in em["actions"] if not a.get("needs_approval")) if x]
-        tools.notify_guardian(emergency_alert_message(em["reason"], auto["auto_reason"], em["hospital"]))
+        tools.notify_guardian(emergency_alert_message(em["reason"], auto["auto_reason"], em["hospital"], em["actions"]))
         sm = run_summary(em, approved=False, executed=executed, decided_by="auto")
         return {"task_id": task_id, "status": "done", "approved": None, "risk_level": em["risk_level"],
                 "executed": executed, **{k: sm[k] for k in ("guardian_message", "elder_message")}}
@@ -173,7 +174,7 @@ def care_approve(task_id, approved: bool | None):
     ("heat", "pending_approval", "경고"),        # profile-02 (중)
     ("induction", "pending_approval", "주의"),   # profile-03 (하)
     ("fall", "pending_approval", "위급"),
-    ("critical", "pending_approval", "위급"),    # 확정안: 119 호출 승인 장면 (바이탈만으로 바로 연결은 끔)
+    ("critical", "pending_approval", "위급"),    # 해든 결정: 문서 2-4장 자동 연결 대신 119 승인 요청
 ])
 def test_care_run_readme_scenarios(scenario, status, level):
     r = care_run(FakeTools(scenario), f"t-{scenario}")
@@ -205,7 +206,7 @@ def test_fall_timeout_calls_119():
 
 
 def test_critical_auto_119_alerts_before_summary(monkeypatch):
-    monkeypatch.setattr(risk, "ENABLE_AUTO_119", True)        # 시연에서는 꺼 둔 확장 설계
+    monkeypatch.setattr(risk, "ENABLE_AUTO_119", True)        # 시연에서는 꺼 둔 확장 설계 (문서 2-4장)
     monkeypatch.setattr(risk, "ENABLE_AUTO_119_VITAL", True)
     tools = FakeTools("critical")
     r = care_run(tools, "t4")
@@ -215,7 +216,7 @@ def test_critical_auto_119_alerts_before_summary(monkeypatch):
 
 
 def test_119_failure_asks_guardian_to_act():
-    tools = FakeTools("critical", fail={"call_119"})
+    tools = FakeTools("fall", fail={"call_119"})        # 승인 뒤 119 (critical은 자동 연결)
     care_run(tools, "t5")
     r = care_approve("t5", True)
     assert "실패" in r["guardian_message"] and "직접 조치" in r["guardian_message"]
@@ -241,10 +242,22 @@ def test_fall_approval_alert_has_cctv_capture():
 
 
 def test_vision_failure_asks_to_check_original_capture():
-    """확정안 7장 8번: 영상 판단 불가 → 바이탈로 위급 + 원본 캡처 확인 요청."""
+    """docs/scenarios.md 7장 8번: 영상 판단 불가 → 바이탈만으로 위급 + 원본 캡처 확인 요청 (119는 승인 요청)."""
     tools = FakeTools("critical")
     tools.analyze_cctv = lambda path: {"image_path": path, "available": False, "description": "영상 판단 불가"}
     r = care_run(tools, "t8")
-    assert r["risk_level"] == "위급"
+    assert (r["status"], r["risk_level"]) == ("pending_approval", "위급")
     assert "원본 캡처를 직접 확인하세요" in tools.log[-1][1]
     PENDING.pop("t8")
+
+
+def test_vision_failure_capture_note_in_auto_119_alert(monkeypatch):
+    """119 자동 연결을 켜도 긴급 알림에 원본 캡처 확인 안내가 붙음."""
+    monkeypatch.setattr(risk, "ENABLE_AUTO_119", True)
+    monkeypatch.setattr(risk, "ENABLE_AUTO_119_VITAL", True)
+    tools = FakeTools("critical")
+    tools.analyze_cctv = lambda path: {"image_path": path, "available": False, "description": "영상 판단 불가"}
+    r = care_run(tools, "t9")
+    assert r["status"] == "done"
+    alert = next(msg for kind, msg in tools.log if kind == "notify_guardian")
+    assert alert.startswith("[긴급]") and "원본 캡처를 직접 확인하세요" in alert

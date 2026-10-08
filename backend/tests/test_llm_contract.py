@@ -11,6 +11,7 @@
 # 2026-10-08 해든 (실제 호출 점검): 실제 gpt-4.1-mini 답에서 나온 문구 3종을 그대로 넣어 걸러지는지 확인.
 # 2026-10-08 해든 (워치 버튼·2차 점검): 이름을 워치로 바꾸고, S19 열 안내(ELDER_CARE_TIP)·S15 글자 수 안내·거절 템플릿 판정 근거 테스트 추가.
 # 2026-10-08 해든 (확정안과 다른 부분 정리): 시연 설정에서 워치 확인을 꺼서 fall 조치가 확정안대로 3개(119·응급실·알림).
+# 2026-10-08 해든 (main 문서 개정판): docs/scenarios.md 기준(NEWS2, fall SpO2 96)으로 기대값을 바꿈.
 
 import json
 
@@ -88,7 +89,7 @@ def test_rejected_summary_prompt_asks_short_elder_message():
 
 def test_good_emergency_output_passes():
     ctx = emergency_ctx("fall")
-    raw = as_raw({"reason": "쓰러짐이 의심되고 심박 118회/분, 산소포화도 95%입니다.",
+    raw = as_raw({"reason": "쓰러짐이 의심되고 심박 118회/분입니다.",
                   "action_texts": ["119에 연락해 구조 요청", "○○병원 응급실 1.2km 안내", "보호자께 상황 알림"]})
     data, errors = validate_emergency(raw, ctx)
     assert errors == [] and data is not None
@@ -123,7 +124,7 @@ def test_not_json_caught():
 
 def test_rounded_number_is_allowed():
     ctx = emergency_ctx("heat")   # 실내 33℃, 심박 105
-    raw = as_raw({"reason": "실내 33도 고온에 심박 105회입니다.", "action_texts": ["에어컨 냉방 26도", "가까운 병원 안내", "보호자께 알림"]})
+    raw = as_raw({"reason": "실내 33도 고온에 심박 105회입니다.", "action_texts": ["에어컨 냉방 26도", "보호자께 알림"]})
     assert validate_emergency(raw, ctx)[1] == []
 
 
@@ -218,7 +219,7 @@ def test_summary_fallback_texts():
     out = fallback_summary(build_summary_ctx(e, True, DEVICE_FAIL))
     assert out["guardian_message"].startswith("에어컨 켜기에 실패했습니다. 직접 조치가 필요합니다.")
     out = fallback_summary(build_summary_ctx(e, False, []))
-    assert out == {"guardian_message": "CCTV 쓰러짐 의심 + 심박·혈압 위험 범위 + 산소포화도 변화. 보호자 거절로 조치 없이 기록했습니다. "
+    assert out == {"guardian_message": "CCTV 쓰러짐 의심 + 심박·혈압 변화. 보호자 거절로 조치 없이 기록했습니다. "
                                        "위험도 위급. 지금 바로 어르신께 직접 연락해 상태를 확인하세요.",
                    "elder_message": "어르신, 보호자분께 상황을 알려 드렸어요. 곧 연락드릴 거예요."}
 

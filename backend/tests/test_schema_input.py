@@ -3,6 +3,7 @@
 # [변경 기록]
 # 2026-10-08 해든: 지혜 님 main 스키마(vital.heart_rate, indoor_environment, devices.induction_minutes)와
 #   확정안 형식(vitals.hr, env, 구조 기기)이 달라 rules.risk.normalize_care_status()를 넣고 같은 결과인지 확인.
+# 2026-10-08 해든 (main 문서 개정판): 스키마에 critical·induction_temperature가 들어가 그대로 씀, 기대값을 docs/scenarios.md 8장으로.
 
 import pytest
 
@@ -14,17 +15,18 @@ from src.agents.profile import vulnerability
 
 
 def to_schema(name: str, vuln: str, cctv_ok: bool = True) -> dict:
-    """확정안 시나리오 값 → main CareStatusResult(model_dump). critical은 Scenario에 아직 없어 fall로 둠."""
+    """확정안 시나리오 값 → main CareStatusResult(model_dump)."""
     s = SCENARIOS[name]
     v, d = s["vitals"], s["devices"]
     cctv = s["cctv"]
     data = CareStatusResult(
-        run_id="run-1", profile_id="profile-01", scenario=name if name != "critical" else "fall",
-        vital={"heart_rate": v["hr"], "systolic_bp": v["sbp"], "diastolic_bp": 80,
+        run_id="run-1", profile_id="profile-01", scenario=name,
+        vital={"heart_rate": v["hr"], "systolic_bp": v["sbp"],
                "temperature_c": v["temp"], "spo2": v["spo2"]},
         indoor_environment={"temperature_c": s["env"]["temp"], "humidity_percent": s["env"]["humidity"]},
         devices={"air_conditioner": d["aircon"]["state"], "induction": d["induction"]["state"],
-                 "induction_minutes": d["induction"]["minutes"] or None},
+                 "induction_minutes": d["induction"]["minutes"] or None,
+                 "induction_temperature": d["induction"]["temperature"] or None},
         cctv=({"image_path": "assets/cctv/x.jpg", "person_visible": cctv.get("person_visible"),
                "posture": cctv.get("posture"), "fall_suspected": cctv.get("fall_suspected"),
                "confidence": 0.9, "description": cctv.get("description"), "status": "analyzed"}
@@ -50,7 +52,7 @@ def test_schema_input_matches_plan_format(name, profile):
 def test_schema_cctv_failure_is_unavailable():
     c = normalize_care_status(to_schema("fall", "하", cctv_ok=False))
     assert c["cctv"]["available"] is False
-    assert evaluate(c, month=8)["risk_level"] == "경고"     # 확정안: CCTV 실패 → 바이탈 1개로 경고
+    assert evaluate(c, month=8)["risk_level"] == "주의"     # docs/scenarios.md 8장: CCTV 실패 → 심박 변화만
 
 
 def test_schema_induction_temperature_when_added():
@@ -79,7 +81,7 @@ def test_schema_voice_response_and_cache_source():
 
 def test_emergency_agent_reads_schema_and_area():
     asked = []
-    out = run_emergency(to_schema("heat", "중"), find_hospital=lambda area: asked.append(area) or "○○병원 응급실 (1.2km)")
-    assert out["risk_level"] == "경고"
+    out = run_emergency(to_schema("fall", "중"), find_hospital=lambda area: asked.append(area) or "○○병원 응급실 (1.2km)")
+    assert out["risk_level"] == "위급"
     assert asked == ["서울 강남구"]
     assert out["hospital"] == "○○병원 응급실 (1.2km)"

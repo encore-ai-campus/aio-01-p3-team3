@@ -7,6 +7,7 @@
 # 2026-10-08 해든 (시연 시나리오 확정안): 바이탈만으로 바로 연결(VITAL_SEVERE)은 기본 꺼짐 → critical은 119 승인 요청.
 #   켰을 때 동작은 monkeypatch로 따로 확인.
 # 2026-10-08 해든 (확정안과 다른 부분 정리): 119 바로 연결·워치 확인은 시연에서 꺼 둠. 이 파일은 extended_design으로 켜고 확인.
+# 2026-10-08 해든 (main 문서 개정판): docs/scenarios.md 기준(NEWS2, fall SpO2 96)으로 기대값을 바꿈. critical 119는 해든 결정으로 승인 요청 유지.
 
 import json
 
@@ -39,7 +40,7 @@ def full(name, **extra):
 @pytest.mark.parametrize("desc, care_status, auto", [
     ("쓰러짐 + 무응답", case(cam("fallen", True), {"watch_response": "none"}), "ELDER_NO_RESPONSE"),
     ("누워 있음 + 무응답", case(cam("lying"), {"watch_response": "none"}), "ELDER_NO_RESPONSE"),
-    ("확정안 critical (바이탈 3개 위험) → 승인 요청", full("critical"), None),
+    ("critical (바이탈 위험 3개) → 승인 요청 (해든 결정)", full("critical"), None),
     ("쓰러짐만 (응답 모름)", case(cam("fallen", True)), None),
     ("쓰러짐 + 워치 '도와주세요' 버튼", case(cam("fallen", True), {"watch_response": "help"}), None),
     ("README fall (바이탈 1~2점 변화)", full("fall"), None),
