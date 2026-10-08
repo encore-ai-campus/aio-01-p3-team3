@@ -268,3 +268,45 @@ render_approval_panel(
     assert submitted == [("run-003", decision)]
     rendered_messages = [item.value for item in (*app.success, *app.info)]
     assert any(expected_message in message for message in rendered_messages)
+
+
+def test_care_workflow_calls_run_api_and_renders_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    submitted: list[tuple[str, str, list[str]]] = []
+
+    def fake_run(
+        backend_url: str,
+        profile_id: str,
+        scenario: str,
+        fault: list[str],
+    ) -> dict[str, object]:
+        assert backend_url == "http://backend.test"
+        submitted.append((profile_id, scenario, fault))
+        return {
+            "run_id": "run-live-001",
+            "status": "no_issue",
+            "current_step": "위험 판정 완료",
+            "message": "이상 없음",
+        }
+
+    monkeypatch.setattr(approval, "request_care_run", fake_run)
+    app = AppTest.from_string(
+        """
+from src.approval import render_care_workflow
+render_care_workflow("http://backend.test")
+"""
+    ).run()
+
+    next(button for button in app.button if button.label == "상태 확인하기").click().run()
+
+    assert not app.exception
+    assert submitted == [("profile-01", "normal", [])]
+    assert any(item.value == "이상 없음" for item in app.success)
+
+
+def test_streamlit_app_mounts_actual_care_workflow() -> None:
+    app = AppTest.from_file("../src/app.py").run()
+
+    assert not app.exception
+    assert any(button.label == "상태 확인하기" for button in app.button)

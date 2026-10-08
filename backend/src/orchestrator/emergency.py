@@ -1,5 +1,5 @@
 """Orchestration 2 (앞부분): Emergency Agent → 스키마 EmergencyResult 변환 — 기화
-(Approval Gate 이후 Action 실행 → Summary는 ⑤ 지혜 님)
+(Approval Gate 이후 Action 실행 → Summary는 ⑤ 두나 님)
 
 해든 님 run_emergency()가 위험도·조치 종류(코드)와 문장(LLM, 실패 시 템플릿)을 만든다.
 이 파일은 ① 병원 정보를 MCP로 미리 받아 넘기고 ② LLM 장애 주입과 로그를 붙이고
@@ -59,7 +59,10 @@ def _arguments(action: dict, reason: str, area: str | None) -> dict[str, str]:
     """ProposedAction.arguments = 해당 MCP 함수의 매개변수 (승인 후 ⑤에서 그대로 호출)."""
     kind = action["type"]
     if kind == "control_device":
-        return {key: str(value) for key, value in (action.get("value") or {}).items()}
+        value = action.get("value") or {}
+        device = str(value.get("device", ""))
+        action_name = value.get("action") or value.get("mode")
+        return {"device": device, "action": str(action_name or "")}
     if kind == "hospital_info":
         return {"area": area or ""}
     return {"message": reason}
