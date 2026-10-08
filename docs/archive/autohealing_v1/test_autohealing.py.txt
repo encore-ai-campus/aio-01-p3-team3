@@ -1,0 +1,133 @@
+import asyncio
+
+import pytest
+
+from src.autohealing import (
+    AutoHealing, HealingStore, RecoveryError, validate_summary, validate_writer,
+)
+
+
+@pytest.fixture
+def healing(tmp_path):
+    return AutoHealing(HealingStore(tmp_path / 'healing.sqlite3'), delay_s=0, timeout_s=0.05)
+
+
+def valid_weather(data):
+    if not isinstance(data, dict) or not isinstance(data.get('temperature'), (float, int)):
+        raise ValueError('Invalid weather')
+
+
+def run_tool(healing, **kwargs):
+    return asyncio.run(healing.tool(task_id='task', step='weather',
+        validate=valid_weather, **kwargs))
+
+
+def test_live_cache_and_injected_recovery(healing):
+    assert run_tool(healing, fetch=lambda: {'temperature': 35}, cache_key='grid-date')['source'] == 'live'
+    result = run_tool(healing, fetch=lambda: pytest.fail('Injected fault must bypass provider'),
+                      cache_key='grid-date', faults=['weather', 'llm'])
+    assert result['source'] == 'cache'
+    assert result['data']['temperature'] == 35
+    logs = healing.store.logs('task')
+    assert [r['status'] for r in logs] == ['success', 'retry', 'retry', 'retry', 'fail', 'fallback']
+    healing.store.finish_task('task', success=True)
+    assert healing.store.metrics()['auto_recovery_rate'] == 1
+
+
+def test_retry_recovers_and_masks_exception(healing):
+    calls = []
+    async def fetch():
+        calls.append(1)
+        if len(calls) == 1:
+            raise TimeoutError('API_KEY=secret, private profile')
+        return {'temperature': 20}
+    assert run_tool(healing, fetch=fetch)['source'] == 'live'
+    logs = healing.store.logs('task')
+    assert logs[0]['error'] == 'TimeoutError'
+    assert 'secret' not in str(logs)
+    assert logs[-1]['recovery'] == 'retry'
+
+
+@pytest.mark.parametrize('cache_state', ['empty', 'expired', 'invalid', 'other-key'])
+def test_unusable_cache_fails(healing, cache_state):
+    if cache_state != 'empty':
+        healing.store.save_cache('other' if cache_state == 'other-key' else 'key',
+                                 {} if cache_state == 'invalid' else {'temperature': 35})
+    if cache_state == 'expired':
+        with healing.store.connect() as db:
+            db.execute('UPDATE cache SET saved_at = 0')
+    with pytest.raises(RecoveryError):
+        run_tool(healing, fetch=lambda: None, cache_key='key', faults=['weather'])
+    healing.store.finish_task('task', success=False)
+    assert healing.store.metrics()['auto_recovery_rate'] == 0
+
+
+def test_csv_fallback(healing):
+    result = run_tool(healing, fetch=lambda: None, fallback=lambda: {'temperature': 20})
+    assert result['source'] == 'csv'
+
+
+def test_timeout_and_no_extra_attempts(healing):
+    calls = []
+    async def slow():
+        calls.append(1)
+        await asyncio.sleep(1)
+    with pytest.raises(RecoveryError):
+        run_tool(healing, fetch=slow)
+    assert len(calls) == 4
+    assert len(healing.store.logs('task')) == 4
+
+
+def test_llm_repair(healing):
+    repairs = []
+    async def generate(repair):
+        repairs.append(repair)
+        return {'actions': ['쉬세요', '외출을 줄이세요', '안부를 확인하세요'], 'reason': '입력에 따른 판정'} if repair else '{}'
+    result = asyncio.run(healing.llm(task_id='task', step='writer', generate=generate,
+        validate=validate_writer, template=lambda: None))
+    assert result['source'] == 'live'
+    assert repairs == [False, True]
+
+
+def test_llm_injected_template_and_bad_template(healing):
+    template = {'elder_message': '무리하지 말고 쉬세요.', 'guardian_message': '안부를 확인해 주세요.'}
+    result = asyncio.run(healing.llm(task_id='task', step='summary',
+        generate=lambda repair: pytest.fail('Injected'), validate=validate_summary,
+        template=lambda: template, faults=['llm']))
+    assert result == {'data': template, 'source': 'template'}
+    with pytest.raises(RecoveryError):
+        asyncio.run(healing.llm(task_id='bad', step='summary', generate=lambda repair: '{}',
+            validate=validate_summary, template=lambda: {}))
+
+
+def test_metrics_use_completed_tasks_and_include_retry_recovery(healing):
+    assert healing.store.metrics()['auto_recovery_rate'] is None
+    for task in ('ok', 'failed', 'pending'):
+        healing.store.log(task, 'weather', 1, 'retry', error='TimeoutError')
+    healing.store.log('ok', 'weather', 2, 'success', recovery='retry', elapsed_ms=100)
+    healing.store.finish_task('ok', success=True)
+    healing.store.finish_task('failed', success=False)
+    healing.store.finish_task('normal', success=True)
+    assert healing.store.metrics() == {'completed_fault_tasks': 2,
+        'auto_recovery_rate': 0.5, 'mean_recovery_ms': 100.0}
+
+
+def test_store_persists_and_parallel_tasks_are_isolated(healing):
+    async def parallel():
+        return await asyncio.gather(*(healing.tool(task_id=str(i), step='weather',
+            fetch=lambda: {'temperature': 20}, validate=valid_weather) for i in range(5)))
+    assert len(asyncio.run(parallel())) == 5
+    reopened = HealingStore(healing.store.path)
+    assert len(reopened.logs('0')) == 1
+    assert reopened.logs('0')[0]['status'] == 'success'
+
+
+@pytest.mark.parametrize('validator,data', [
+    (validate_writer, {'actions': 'abc', 'reason': 'x'}),
+    (validate_writer, {'actions': ['a', 'b', 'c']}),
+    (validate_summary, {'elder_message': 'x' * 91, 'guardian_message': 'x'}),
+    (validate_summary, {'elder_message': '', 'guardian_message': 'x'}),
+])
+def test_output_validation(validator, data):
+    with pytest.raises(ValueError):
+        validator(data)

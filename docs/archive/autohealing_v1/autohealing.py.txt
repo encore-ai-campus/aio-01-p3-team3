@@ -1,0 +1,199 @@
+"""Async recovery adapters. Callbacks own parsing, prompts and domain decisions."""
+
+import asyncio
+import json
+import sqlite3
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Callable
+
+
+class RecoveryError(RuntimeError):
+    """No valid recovery source remains; the orchestrator decides what follows."""
+
+
+class HealingStore:
+    def __init__(self, path: str | Path):
+        self.path = str(path)
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        with self.connect() as db:
+            db.executescript("""
+                CREATE TABLE IF NOT EXISTS cache (
+                    key TEXT PRIMARY KEY, value TEXT NOT NULL, saved_at REAL NOT NULL);
+                CREATE TABLE IF NOT EXISTS run_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    task_id TEXT NOT NULL, step TEXT NOT NULL, attempt INTEGER NOT NULL,
+                    status TEXT NOT NULL, error TEXT, recovery TEXT,
+                    elapsed_ms INTEGER NOT NULL, created_at TEXT NOT NULL);
+                CREATE INDEX IF NOT EXISTS logs_task ON run_logs(task_id);
+                CREATE TABLE IF NOT EXISTS task_results (
+                    task_id TEXT PRIMARY KEY, success INTEGER NOT NULL);
+            """)
+
+    def connect(self):
+        db = sqlite3.connect(self.path, timeout=5)
+        db.row_factory = sqlite3.Row
+        return db
+
+    def save_cache(self, key: str, data: Any):
+        value = json.dumps(data, ensure_ascii=False, allow_nan=False)
+        with self.connect() as db:
+            db.execute("INSERT OR REPLACE INTO cache VALUES (?, ?, ?)",
+                       (key, value, time.time()))
+
+    def load_cache(self, key: str, max_age_s: float):
+        with self.connect() as db:
+            row = db.execute("SELECT * FROM cache WHERE key = ?", (key,)).fetchone()
+        if row is None or not 0 <= time.time() - row['saved_at'] <= max_age_s:
+            return None
+        try:
+            return json.loads(row['value']), row['saved_at']
+        except (ValueError, TypeError):
+            return None
+
+    def log(self, task_id, step, attempt, status, *, error=None, recovery=None, elapsed_ms=0):
+        # Only error class names are accepted from wrappers, never exception messages.
+        with self.connect() as db:
+            db.execute("""INSERT INTO run_logs
+                (task_id,step,attempt,status,error,recovery,elapsed_ms,created_at)
+                VALUES (?,?,?,?,?,?,?,?)""",
+                (task_id, step, attempt, status, error, recovery, elapsed_ms,
+                 datetime.now(timezone.utc).isoformat()))
+
+    def finish_task(self, task_id: str, *, success: bool):
+        with self.connect() as db:
+            db.execute("INSERT OR REPLACE INTO task_results VALUES (?, ?)",
+                       (task_id, int(success)))
+
+    def logs(self, task_id: str):
+        with self.connect() as db:
+            return [dict(row) for row in db.execute(
+                "SELECT * FROM run_logs WHERE task_id = ? ORDER BY id", (task_id,))]
+
+    def metrics(self):
+        with self.connect() as db:
+            rows = db.execute("""SELECT t.success FROM task_results t
+                WHERE EXISTS (SELECT 1 FROM run_logs l WHERE l.task_id=t.task_id
+                AND l.status IN ('retry','fallback','fail'))""").fetchall()
+            elapsed = db.execute("""SELECT AVG(elapsed_ms) FROM run_logs
+                WHERE status IN ('success','fallback') AND recovery IS NOT NULL""").fetchone()[0]
+        return {'completed_fault_tasks': len(rows),
+                'auto_recovery_rate': sum(r['success'] for r in rows) / len(rows) if rows else None,
+                'mean_recovery_ms': elapsed}
+
+
+async def _invoke(callback, *args):
+    # Sync API clients must not block asyncio.gather / FastAPI's event loop.
+    if asyncio.iscoroutinefunction(callback):
+        return await callback(*args)
+    value = await asyncio.to_thread(callback, *args)
+    if hasattr(value, '__await__'):
+        return await value
+    return value
+
+
+class AutoHealing:
+    def __init__(self, store: HealingStore, *, retries=3, delay_s=0.5, timeout_s=15):
+        if retries < 0 or delay_s < 0 or timeout_s <= 0:
+            raise ValueError('Invalid recovery policy')
+        self.store, self.retries = store, retries
+        self.delay_s, self.timeout_s = delay_s, timeout_s
+
+    async def tool(self, *, task_id: str, step: str, fetch: Callable,
+                   validate: Callable, cache_key: str | None = None,
+                   max_age_s: float = 3600, fallback: Callable | None = None,
+                   faults=()):
+        """Initial call + retries; then valid cache or caller-provided CSV fallback."""
+        if max_age_s < 0:
+            raise ValueError('max_age_s must be nonnegative')
+        start = time.monotonic()
+        elapsed = lambda: round((time.monotonic() - start) * 1000)
+        for attempt in range(1, self.retries + 2):
+            try:
+                if step in faults:
+                    raise TimeoutError('Injected fault')
+                data = await asyncio.wait_for(_invoke(fetch), self.timeout_s)
+                validate(data)
+            except Exception as error:
+                self.store.log(task_id, step, attempt, 'retry' if attempt <= self.retries else 'fail',
+                               error=type(error).__name__, elapsed_ms=elapsed())
+                if attempt <= self.retries:
+                    await asyncio.sleep(self.delay_s * attempt)
+                continue
+            if cache_key is not None:
+                self.store.save_cache(cache_key, data)
+            self.store.log(task_id, step, attempt, 'success',
+                           recovery='retry' if attempt > 1 else None, elapsed_ms=elapsed())
+            return {'data': data, 'source': 'live'}
+
+        cached = self.store.load_cache(cache_key, max_age_s) if cache_key is not None else None
+        if cached is not None:
+            try:
+                validate(cached[0])
+            except Exception:
+                pass
+            else:
+                self.store.log(task_id, step, attempt, 'fallback', recovery='cache', elapsed_ms=elapsed())
+                return {'data': cached[0], 'source': 'cache', 'saved_at': cached[1]}
+        if fallback is not None:
+            try:
+                data = await asyncio.wait_for(_invoke(fallback), self.timeout_s)
+                validate(data)
+            except Exception as error:
+                self.store.log(task_id, step, attempt, 'fail', error=type(error).__name__, elapsed_ms=elapsed())
+            else:
+                self.store.log(task_id, step, attempt, 'fallback', recovery='csv', elapsed_ms=elapsed())
+                return {'data': data, 'source': 'csv'}
+        raise RecoveryError(f'{step}: recovery exhausted')
+
+    async def llm(self, *, task_id: str, step: str, generate: Callable,
+                  validate: Callable, template: Callable, faults=()):
+        """generate(repair: bool) owns the prompt. One repair request, then template."""
+        start = time.monotonic()
+        elapsed = lambda: round((time.monotonic() - start) * 1000)
+        for attempt in (1, 2):
+            try:
+                if 'llm' in faults or step in faults:
+                    raw = '{broken'
+                else:
+                    raw = await asyncio.wait_for(_invoke(generate, attempt == 2), self.timeout_s)
+                data = json.loads(raw) if isinstance(raw, str) else raw
+                validate(data)
+            except Exception as error:
+                self.store.log(task_id, step, attempt, 'retry' if attempt == 1 else 'fail',
+                               error=type(error).__name__, elapsed_ms=elapsed())
+                continue
+            self.store.log(task_id, step, attempt, 'success',
+                           recovery='retry' if attempt == 2 else None, elapsed_ms=elapsed())
+            return {'data': data, 'source': 'live'}
+        try:
+            data = await asyncio.wait_for(_invoke(template), self.timeout_s)
+            validate(data)
+        except Exception as error:
+            self.store.log(task_id, step, 2, 'fail', error=type(error).__name__, elapsed_ms=elapsed())
+            raise RecoveryError(f'{step}: invalid fallback template') from None
+        self.store.log(task_id, step, 2, 'fallback', recovery='template', elapsed_ms=elapsed())
+        return {'data': data, 'source': 'template'}
+
+
+def validate_writer(data):
+    if not isinstance(data, dict):
+        raise ValueError('Writer must be an object')
+    actions = data.get('actions')
+    if not isinstance(actions, list) or len(actions) != 3:
+        raise ValueError('Expected three actions')
+    if any(not isinstance(a, str) or not a.strip() or len(a) > 20 for a in actions):
+        raise ValueError('Invalid action')
+    if not isinstance(data.get('reason'), str) or not data['reason'].strip():
+        raise ValueError('Missing reason')
+
+
+def validate_summary(data):
+    if not isinstance(data, dict):
+        raise ValueError('Summary must be an object')
+    for key in ('elder_message', 'guardian_message'):
+        if not isinstance(data.get(key), str) or not data[key].strip():
+            raise ValueError('Missing message')
+    if len(data['elder_message']) > 90:
+        raise ValueError('Elder message exceeds 90 characters')
