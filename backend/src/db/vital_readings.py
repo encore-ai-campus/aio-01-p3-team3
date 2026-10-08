@@ -84,14 +84,15 @@ class VitalReadings:
                                 and tuple(previous[f] for f in VITAL_FIELDS) == values)
                         if not same:
                             raise ReadingConflict('reading_id already used for another payload')
-                        return {'status': 'duplicate', 'reading_id': reading_id, 'attempts': attempt}
-                    conn.execute('''INSERT INTO vital_readings
+                        return {'status': 'duplicate', 'id': previous['id'], 'reading_id': reading_id, 'attempts': attempt}
+                    cursor = conn.execute('''INSERT INTO vital_readings
                         (reading_id,profile_id,scenario,heart_rate,systolic_bp,
                          temperature_c,spo2,measured_at,measured_at_epoch,received_at,received_at_epoch)
                         VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
                         (reading_id, profile_id, scenario, *values, measured_at, measured_epoch,
                          received_at, received_epoch))
-                return {'status': 'inserted', 'reading_id': reading_id, 'attempts': attempt}
+                    row_id = cursor.lastrowid
+                return {'status': 'inserted', 'id': row_id, 'reading_id': reading_id, 'attempts': attempt}
             except sqlite3.OperationalError as error:
                 code = getattr(error, 'sqlite_errorcode', 0) & 0xff
                 if code not in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED) or attempt == self.write_policy.max_attempts:
@@ -118,7 +119,7 @@ class VitalReadings:
         age = self.db.clock() - row['measured_at_epoch']
         if not 0 <= age <= max_age_s:
             return None
-        return {'reading_id': row['reading_id'], 'profile_id': row['profile_id'],
+        return {'id': row['id'], 'reading_id': row['reading_id'], 'profile_id': row['profile_id'],
                 'scenario': row['scenario'], 'origin': 'simulator',
                 'data': {**{f: row[f] for f in VITAL_FIELDS}, 'measured_at': row['measured_at']},
                 'received_at': row['received_at'], 'measured_age_s': age}

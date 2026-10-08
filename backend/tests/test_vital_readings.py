@@ -31,7 +31,7 @@ def save(repo, reading_id='r1', profile_id='p1', scenario='heat', **changes):
 
 def test_insert_schema_compatible_and_reopen(db):
     result = save(VitalReadings(db))
-    assert result == {'status':'inserted','reading_id':'r1','attempts':1}
+    assert result == {'status':'inserted','id':1,'reading_id':'r1','attempts':1}
     reopened = VitalReadings(Database(db.path, clock=lambda: NOW))
     latest = reopened.latest('p1', scenario='heat', max_age_s=30)
     assert VitalData.model_validate(latest['data']).model_dump() == data()
