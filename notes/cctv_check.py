@@ -4,6 +4,8 @@
 2026-10-08 해든: 새 파일. 4단계(CCTV 분석 실제 호출)를 기화 님 이미지 없이 먼저 확인하려고 만듦.
 2026-10-08 해든 (시연 대비): --repeat N으로 이미지마다 N번 불러 답이 흔들리는지 봄 (시연 전 3~5번 권장).
   위험도 판정은 시연 시나리오 확정안 조합(바이탈은 그 이미지를 쓰는 시나리오 값, 프로필 profile-03 하)으로 바꿈.
+2026-10-12 해든 (CCTV 이미지 png 전환): 두나 님이 assets/cctv의 jpg를 지우고 기화 님 png 4장만 남겨서,
+  .png도 읽고 정답표(EXPECTED, jpg 이름 기준)는 파일 이름 앞부분(fall, lying 등)으로 찾게 함.
 
 실행 (저장소 맨 위 폴더에서):
     pip install "openai>=1.66" pillow
@@ -56,7 +58,8 @@ def use_package(name):
 
 def main():
     load_env()
-    images = [p for p in sorted(IMAGES.glob("*.jpg")) if p.name in EXPECTED]
+    # png(시연 사진)와 jpg(가짜 이미지) 둘 다 읽음. 정답표는 "fall.jpg"처럼 jpg 이름이라 앞부분으로 맞춤 (해든 10/12)
+    images = [p for p in sorted(IMAGES.iterdir()) if p.suffix in (".png", ".jpg") and f"{p.stem}.jpg" in EXPECTED]
     if not images:
         print("이미지가 없습니다. 먼저 python notes/make_fake_cctv.py 를 실행하세요.")
         return 1
@@ -72,6 +75,7 @@ def main():
             runs.setdefault(img.name, []).append(out)
             print(f"{img.name} #{i + 1}: {out.get('posture')} / {out.get('description')} ({time.time() - start:.1f}초)")
         results.append((img.name, runs[img.name][0], time.time() - start))
+    key = lambda name: f"{Path(name).stem}.jpg"     # noqa: E731  정답표·시나리오 바이탈 찾기용 이름
 
     use_package("backend")
     from src.rules.risk import evaluate
@@ -88,12 +92,12 @@ def main():
 
     rows, ok_count = [], 0
     for name, out, sec in results:
-        desc, posture, visible, fall, note = EXPECTED[name]
+        desc, posture, visible, fall, note = EXPECTED[key(name)]
         stable = sum(matches(o, posture, visible, fall) for o in runs[name])
         ok = stable == len(runs[name])
         ok_count += ok
-        r = evaluate({"vitals": {**scene_vitals.get(name, normal_vitals), "source": "live"}, "env": {"temp": 24},
-                      "devices": kitchen if name == "kitchen_empty.jpg" else off,
+        r = evaluate({"vitals": {**scene_vitals.get(key(name), normal_vitals), "source": "live"}, "env": {"temp": 24},
+                      "devices": kitchen if key(name) == "kitchen_empty.jpg" else off,
                       "cctv": out, "vulnerability": "하"}, month=8)
         rows.append((name, desc, posture, out, ok, sec, note + (f" (반복 {stable}/{len(runs[name])} 일치)" if repeat > 1 else ""), r))
 
