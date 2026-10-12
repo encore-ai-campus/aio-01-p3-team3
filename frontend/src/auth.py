@@ -1,6 +1,6 @@
 """시연용 데모 계정 로그인 (회원가입 없음) — 기화
 
-보호자(자녀) 한 명이 어르신(부모) 한 분을 보는 화면을 시연하기 위한 간단한 로그인이다.
+보호자 한 명이 어르신 한 분을 보는 화면을 시연하기 위한 간단한 로그인이다.
 계정 4개는 config/.env의 DEMO_ACCOUNTS에만 두고 저장소에는 올리지 않는다.
   형식: 아이디:비밀번호:프로필ID 를 쉼표로 구분
   예)   DEMO_ACCOUNTS=childA:비밀번호A:profile-01,childB:비밀번호B:profile-02,childC:비밀번호C:profile-03,childD:비밀번호D:profile-04

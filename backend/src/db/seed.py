@@ -6,7 +6,7 @@ PROFILES = (
     dict(profile_id='profile-01', age=84, lives_alone=True, has_condition=True, mobility_limited=True, area='서울시 강남구'),
     dict(profile_id='profile-02', age=78, lives_alone=True, has_condition=False, mobility_limited=False, area='서울시 송파구'),
     dict(profile_id='profile-03', age=70, lives_alone=True, has_condition=False, mobility_limited=False, area='서울시 서초구'),
-    # 기화 10/12: 시연 영상의 네 번째 보호자 계정(자녀 D)이 보는 어르신 D. 취약도 상
+    # 기화 10/12: 시연 영상의 네 번째 데모 계정(보호자 D)이 보는 어르신 D. 취약도 상
     dict(profile_id='profile-04', age=86, lives_alone=True, has_condition=True, mobility_limited=True, area='서울시 강남구'),
 )
 
