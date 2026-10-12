@@ -12,7 +12,7 @@ from src.vision import analyzer
 
 
 def test_mock_data_matches_latest_team_contract() -> None:
-    assert set(MOCK_PROFILES) == {"profile-01", "profile-02", "profile-03"}
+    assert set(MOCK_PROFILES) == {"profile-01", "profile-02", "profile-03", "profile-04"}
     assert set(SCENARIOS) == {"normal", "heat", "induction", "fall", "critical"}
     assert SCENARIOS["fall"]["vital"] == {
         "heart_rate": 118,
