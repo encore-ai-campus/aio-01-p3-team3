@@ -179,8 +179,11 @@ def render_approval_result(result: Mapping[str, object]) -> None:
 
     status = str(result.get("status", "fail"))
     if status == "done":
-        if result.get("decided_by") == "auto":
+        decided_by = result.get("decided_by")
+        if decided_by == "auto":
             st.success("자동 긴급 조치를 실행했습니다.")
+        elif decided_by == "timeout":
+            st.warning("승인 응답이 없어 정해진 시간 뒤 자동으로 조치를 실행했습니다.")
         else:
             st.success("승인된 조치를 실행했습니다.")
     elif status == "rejected":
