@@ -54,6 +54,10 @@
 #   - 실내 이상 28℃ 초과 / 20℃ 미만, 실내 극한 31℃ 초과 / 18℃ 미만 → 경고 (ENABLE_ENV_EXTREME = True)
 #   - 작은 바이탈 변화(1~2점)도 그 축 주의 (VITAL_CHANGE_ALONE_RAISES = True)
 #   - 단, 해든 결정으로 critical도 119는 보호자 승인 (문서 2-4장 VITAL_SEVERE 자동 연결은 끔, ENABLE_AUTO_119 = False). 워치 확인도 계속 끔.
+# 2026-10-12 해든 (CCTV 출력 계약, 선택지 B): cctv.status가 "analyzed"면 README 필수 4항목(person_visible, posture,
+#   fall_suspected, description)이 모두 있고 자료형이 맞아야 함. cctv_contract_errors()로 검사하고,
+#   어기면 normalize_care_status()가 "영상 판단 불가"(status failed)로 바꿔 바이탈 중심으로 판정 (README DR-VISION-01).
+#   failed·unavailable은 분석 항목이 없어도 됨. 지혜 님 validation.py, 기화 님 iot.py 재시도 검사에서 같은 함수를 쓰면 됨.
 #
 # 모든 수치는 시연용 예시 규칙이며 의학적 기준이 아님. 발표 전 출처(NEWS2, 질병관리청, WHO) 원문 확인.
 # 팀원과 겹치는 부분에는 "# [팀 합의] 이름: 설명" 주석을 달았음. 검색: grep -n "팀 합의" risk.py
@@ -606,6 +610,40 @@ SCHEMA_VITAL_KEYS = {"heart_rate": "hr", "systolic_bp": "sbp", "temperature_c": 
 CCTV_SURE_FROM = 0.6        # 숫자 confidence가 이 값 이상이면 "high"
 
 
+# ---------- CCTV 출력 계약 (해든 10/12, 선택지 B) ----------
+
+# README 4장 CCTV 필수 키와 자료형. 분석 성공(status "analyzed")일 때만 모두 요구한다.
+CCTV_REQUIRED = {"person_visible": bool, "posture": str, "fall_suspected": bool, "description": str}
+CCTV_POSTURES = {"standing", "sitting", "lying", "fallen", "none"}     # schemas.CctvAnalysis.posture와 같음
+CCTV_FAILED_TEXT = "영상 판단 불가"
+
+
+# [팀 합의] 지혜 님: validation.py에서 CCTV 결과를 검사할 때 이 함수를 그대로 쓰면 됨 (빈 목록이면 PASS).
+# [팀 합의] 기화 님: agents/iot.py _cctv()의 with_healing validate를
+#   validate=lambda data: not cctv_contract_errors(data) 로 바꾸면 계약 위반도 재시도(2회) → 끝내 실패하면 status "failed".
+# [팀 합의] 전체: description이 빈 문자열이어도 지금은 통과 (README에 정해지지 않음). 금지하려면 아래 한 줄을 켜면 됨.
+def cctv_contract_errors(cctv) -> list[str]:
+    """CCTV 분석 결과가 출력 계약을 어긴 이유 목록. 빈 목록이면 계약을 지킴.
+    status가 analyzed가 아니면(failed·unavailable) 분석 항목이 없어도 됨."""
+    cctv = _plain(cctv)
+    if not isinstance(cctv, dict):
+        return ["cctv 결과가 dict가 아님"]
+    status = cctv.get("status", "analyzed" if cctv.get("available", True) else "unavailable")
+    if status != "analyzed":
+        return []
+    errors = []
+    for key, kind in CCTV_REQUIRED.items():
+        value = cctv.get(key)
+        if value is None:
+            errors.append(f"{key} 없음")
+        elif not isinstance(value, kind):
+            errors.append(f"{key} 자료형 오류({kind.__name__})")
+    if isinstance(cctv.get("posture"), str) and cctv["posture"] not in CCTV_POSTURES:
+        errors.append(f"posture 값 오류({cctv['posture']!r})")
+    # if isinstance(cctv.get("description"), str) and not cctv["description"].strip(): errors.append("description 빈 문자열")
+    return errors
+
+
 def _plain(value):
     """Pydantic 모델이면 dict로."""
     return value.model_dump() if hasattr(value, "model_dump") else value
@@ -648,6 +686,13 @@ def normalize_care_status(care_status) -> dict:
             cctv["confidence"] = "high" if conf >= CCTV_SURE_FROM else "low"
         if not cctv.get("description"):
             cctv["description"] = cctv.get("summary")
+        # 해든 10/12 (선택지 B): 분석 성공이라면서 필수 4항목이 빠지거나 자료형이 틀리면 믿지 않고 "영상 판단 불가"로 본다.
+        #   → 낙상 축은 CCTV_UNAVAILABLE(보호자에게 원본 캡처 확인 요청), 위험도는 바이탈 중심. 캡처 경로(image_path)는 그대로 둠.
+        #   계약 검사는 main 스키마 형식(status 키가 있을 때)에만 한다. 예전 확정안 형식(status 없음)은 그대로.
+        if cctv.get("status") == "analyzed":
+            problems = cctv_contract_errors(cctv)
+            if problems:
+                cctv.update(status="failed", available=False, description=CCTV_FAILED_TEXT, contract_errors=problems)
         cs["cctv"] = cctv
 
     event = _plain(cs.get("fall_event"))

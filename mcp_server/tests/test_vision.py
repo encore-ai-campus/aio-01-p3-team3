@@ -5,6 +5,7 @@
 # 2026-10-08 해든 (CCTV 판단 방식 변경): LLM 답이 "보이는 사실 4개"로 바뀌어 raw()와 보정 테스트를 다시 씀.
 #   사실 → 자세·낙상 의심 표(FACT_RULES)는 test_fact_rules에서 확정안 이미지 4장 장면으로 확인.
 # 2026-10-08 해든 (두나 님 tools/cctv.py 연결): confidence 숫자로, 두나 님 analyze_cctv 도구 검증 통과 테스트 2개 추가.
+# 2026-10-12 해든 (CCTV 출력 계약, 선택지 B): analyzed면 필수 4항목, 깨지면 재시도 → unavailable 테스트 추가.
 
 import base64
 import json
@@ -15,6 +16,7 @@ from src.vision.analyzer import (
     UNAVAILABLE_TEXT,
     CONFIDENCE,
     analyze_cctv_or_unavailable,
+    check_output_contract,
     encode_image,
     make_vision_llm,
     facts_to_result,
@@ -185,3 +187,40 @@ def test_dunas_cctv_tool_accepts_unavailable(tmp_path):
     from src.tools import cctv
     out = cctv.analyze_cctv(str(tmp_path / "none.jpg"))
     assert out["status"] == "unavailable" and out["person_visible"] is False and out["available"] is False
+
+
+# ---------- 출력 계약 (해든 10/12, 선택지 B: analyzed면 필수 4항목) ----------
+
+def test_analyzed_result_always_has_required_four(image):
+    out = analyze_cctv_or_unavailable(image, FakeVision(raw()))
+    assert out["status"] == "analyzed" and check_output_contract(out) == []
+    for key in ("person_visible", "posture", "fall_suspected", "description"):
+        assert key in out
+
+
+@pytest.mark.parametrize("broken, word", [
+    ({"posture": None}, "posture"),
+    ({"fall_suspected": "yes"}, "fall_suspected"),
+    ({"person_visible": None}, "person_visible"),
+    ({"description": 3}, "description"),
+    ({"posture": "jumping"}, "posture 값 오류"),
+])
+def test_contract_catches_missing_or_wrong_type(broken, word):
+    good = {"status": "analyzed", "person_visible": True, "posture": "sitting",
+            "fall_suspected": False, "description": "앉아 계신 것으로 보입니다."}
+    assert any(word in e for e in check_output_contract({**good, **broken}))
+
+
+def test_unavailable_needs_no_analysis_fields():
+    assert check_output_contract({"status": "unavailable"}) == []
+
+
+def test_broken_contract_is_retried_then_unavailable(image, monkeypatch):
+    """규칙 표가 잘못 바뀌어 posture가 비어도 analyzed로 나가지 않고 재시도 → 영상 판단 불가."""
+    import src.vision.analyzer as analyzer
+    monkeypatch.setattr(analyzer, "facts_to_result", lambda facts: {"person_visible": True, "fall_suspected": False,
+                                                                      "posture": None, "confidence": 0.9})
+    llm = FakeVision(raw(), raw(), raw())
+    out = analyze_cctv_or_unavailable(image, llm)
+    assert out["status"] == "unavailable" and out["description"] == UNAVAILABLE_TEXT
+    assert len(llm.prompts) == 3
