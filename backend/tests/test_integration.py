@@ -208,7 +208,9 @@ def test_fall_timeout_only_reminds_when_switched_off(monkeypatch):
     assert r["status"] == "pending_approval" and not any(x[0] == "call_119" for x in tools.log)
 
 
-def test_fall_timeout_calls_119():
+def test_fall_timeout_calls_119(monkeypatch):
+    """ENABLE_TIMEOUT_119를 켰을 때만 60초 무응답 자동 연결 (시연 기본값은 꺼짐, 기화 10/12)."""
+    monkeypatch.setattr(risk, "ENABLE_TIMEOUT_119", True)
     tools = FakeTools("fall")
     care_run(tools, "t3")
     r = care_approve("t3", None)

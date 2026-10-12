@@ -244,7 +244,9 @@ def test_no_approval_action_cannot_say_approve():
 
 def test_prompt_marks_approval_per_action():
     p = emergency_prompt(emergency_ctx("fall"))
-    assert "1. 119 호출 [승인 필요, 60초 응답 없으면 자동 연결]" in p and "2. 가까운 병원 정보 안내 [승인 없음, 바로 실행]" in p
+    # 60초 무응답 자동 연결은 끔 (기화 10/12) → 119는 그냥 "승인 필요"
+    assert "1. 119 호출 [승인 필요]" in p and "2. 가까운 병원 정보 안내 [승인 없음, 바로 실행]" in p
+    assert "자동 연결" not in p
 
 
 @pytest.mark.parametrize("guardian, elder", [
