@@ -68,6 +68,7 @@
 #     흐린 사진·자세와 플래그 불일치는 낙상 의심(FALL_SUSPECTED) = 경고. 시연 fall.png는 그대로 위급.
 #   - ENABLE_TIMEOUT_119 = False: README "그 밖의 119는 모두 보호자 승인". 60초 무응답 자동 연결을 끄고
 #     on_timeout을 "remind"(다시 알림)로. 보호자 알림의 "60초 안에 응답이 없으면 119에 자동으로 연락" 문구도 같이 빠짐.
+#   - 같은 날 팀 의견으로 60초 무응답 자동 연결은 유지하기로 정해져 ENABLE_TIMEOUT_119 = True로 되돌림 (설정값은 남김).
 #
 # 모든 수치는 시연용 예시 규칙이며 의학적 기준이 아님. 발표 전 출처(NEWS2, 질병관리청, WHO) 원문 확인.
 # 팀원과 겹치는 부분에는 "# [팀 합의] 이름: 설명" 주석을 달았음. 검색: grep -n "팀 합의" risk.py
@@ -137,9 +138,9 @@ ENABLE_AUTO_119_VITAL = True
 VITAL_SEVERE_SCORE = 7
 # [팀 합의] 지혜 님: 승인 대기 시간. 119 승인 요청에 이 시간 동안 응답이 없으면 119에 자동 연결.
 GUARDIAN_WAIT_119_SEC = 60
-# 해든 10/12: README 9장 "그 밖의 119는 모두 보호자 승인"에 맞춰 False. 승인 대기 시간이 지나도 119를 걸지 않고 다시 알림만.
-#   True로 바꾸면 예전처럼 GUARDIAN_WAIT_119_SEC 무응답 시 자동 연결(on_timeout "execute", decided_by "timeout").
-ENABLE_TIMEOUT_119 = False
+# 해든 10/12: 팀 의견으로 유지. 119 승인 요청에 GUARDIAN_WAIT_119_SEC 동안 응답이 없으면 자동 연결(on_timeout "execute", decided_by "timeout").
+#   False로 바꾸면 시간이 지나도 119를 걸지 않고 다시 알림만 (on_timeout "remind").
+ENABLE_TIMEOUT_119 = True
 GUARDIAN_REMIND_SEC = 30      # 승인 요청 뒤 응답이 없으면 한 번 더 알림
 AUTO_119_LABEL = {"ELDER_NO_RESPONSE": "어르신 응답 없음", "VITAL_SEVERE": "바이탈 여러 항목 매우 위험"}
 

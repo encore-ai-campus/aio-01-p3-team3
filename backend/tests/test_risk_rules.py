@@ -14,7 +14,7 @@
 # 2026-10-08 해든 (main 문서 개정판): docs/scenarios.md 2·5·8장 기준(NEWS2, 실내 28/20·극한 31/18)으로 기대값을 바꿈. critical 119는 해든 결정으로 승인 요청.
 # 2026-10-08 해든 (확정안과 다른 부분 정리): 시연 설정에서 워치 확인을 꺼서 fall 조치가 확정안대로 3개(119·응급실·알림).
 # 2026-10-12 해든: README대로 critical(VITAL_SEVERE) 119 자동 연결, 에어컨 조치 값에 action 추가에 맞춰 기대값을 바꿈.
-# 2026-10-12 해든 (README 9장 최종 맞춤): CCTV 약한 의심 = 경고(CCTV_SUSPECT_IS_CRITICAL False), 119 시간 초과 자동 연결 끔(ENABLE_TIMEOUT_119 False). 예전 동작은 monkeypatch로 확인.
+# 2026-10-12 해든 (README 9장 최종 맞춤): CCTV 약한 의심 = 경고(CCTV_SUSPECT_IS_CRITICAL False), 119 60초 무응답 자동 연결은 팀 의견으로 유지(ENABLE_TIMEOUT_119 True). 반대 설정은 monkeypatch로 확인.
 
 import pytest
 
@@ -286,9 +286,9 @@ def test_heat_reason_has_body_temp_and_indoor():
 
 
 def test_demo_settings_follow_final_plan():
-    """README 9장: 워치 확인은 끔, CCTV 약한 의심은 경고, 시간 초과 119 없음. 바이탈 매우 위험이면 119 자동 연결."""
+    """README 9장: 워치 확인은 끔, CCTV 약한 의심은 경고, 119 승인 60초 무응답이면 자동 연결(팀 의견). 바이탈 매우 위험이면 119 자동 연결."""
     import src.rules.risk as risk
-    assert risk.ENABLE_WATCH_CHECK is False and risk.CCTV_SUSPECT_IS_CRITICAL is False and risk.ENABLE_TIMEOUT_119 is False
+    assert risk.ENABLE_WATCH_CHECK is False and risk.CCTV_SUSPECT_IS_CRITICAL is False and risk.ENABLE_TIMEOUT_119 is True
     assert risk.ENABLE_AUTO_119 is True and risk.ENABLE_AUTO_119_VITAL is True and risk.VITAL_DANGER_FROM_NEWS2 is True and risk.ENABLE_ENV_EXTREME is True
 
 
