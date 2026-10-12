@@ -11,7 +11,8 @@ CREATE INDEX IF NOT EXISTS logs_run ON run_logs(run_id, id);
 CREATE TABLE IF NOT EXISTS profiles (
     profile_id TEXT PRIMARY KEY, age INTEGER NOT NULL,
     lives_alone INTEGER NOT NULL, has_condition INTEGER NOT NULL,
-    mobility_limited INTEGER NOT NULL
+    mobility_limited INTEGER NOT NULL,
+    area TEXT
 );
 -- Internal simulator storage contract; independent of the pending HTTP request model.
 CREATE TABLE IF NOT EXISTS vital_readings (
@@ -20,9 +21,10 @@ CREATE TABLE IF NOT EXISTS vital_readings (
     profile_id TEXT NOT NULL,
     scenario TEXT,
     heart_rate INTEGER NOT NULL,
-    systolic_bp INTEGER NOT NULL,
-    temperature_c REAL NOT NULL,
-    spo2 INTEGER NOT NULL,
+    systolic_bp INTEGER,
+    diastolic_bp INTEGER,
+    temperature_c REAL,
+    spo2 INTEGER,
     measured_at TEXT NOT NULL,
     measured_at_epoch REAL NOT NULL,
     received_at TEXT NOT NULL,

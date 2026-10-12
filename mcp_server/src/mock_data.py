@@ -61,7 +61,7 @@ SCENARIOS: Final[dict[Scenario, dict[str, object]]] = {
             "induction_minutes": None,
             "induction_temperature": None,
         },
-        "cctv_image_path": "assets/cctv/normal.jpg",
+        "cctv_image_path": "assets/cctv/normal.png",
     },
     "heat": {
         "vital": {
@@ -80,7 +80,7 @@ SCENARIOS: Final[dict[Scenario, dict[str, object]]] = {
             "induction_minutes": None,
             "induction_temperature": None,
         },
-        "cctv_image_path": "assets/cctv/normal.jpg",
+        "cctv_image_path": "assets/cctv/normal.png",
     },
     "induction": {
         "vital": {
@@ -99,7 +99,7 @@ SCENARIOS: Final[dict[Scenario, dict[str, object]]] = {
             "induction_minutes": 120,
             "induction_temperature": 300,
         },
-        "cctv_image_path": "assets/cctv/kitchen_empty.jpg",
+        "cctv_image_path": "assets/cctv/kitchen_empty.png",
     },
     "fall": {
         "vital": {
@@ -118,7 +118,7 @@ SCENARIOS: Final[dict[Scenario, dict[str, object]]] = {
             "induction_minutes": None,
             "induction_temperature": None,
         },
-        "cctv_image_path": "assets/cctv/fall.jpg",
+        "cctv_image_path": "assets/cctv/fall.png",
     },
     "critical": {
         "vital": {
@@ -137,7 +137,7 @@ SCENARIOS: Final[dict[Scenario, dict[str, object]]] = {
             "induction_minutes": None,
             "induction_temperature": None,
         },
-        "cctv_image_path": "assets/cctv/lying.jpg",
+        "cctv_image_path": "assets/cctv/lying.png",
     },
 }
 

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 
-VITAL_FIELDS = ('heart_rate', 'systolic_bp', 'temperature_c', 'spo2')
+VITAL_FIELDS = ('heart_rate', 'systolic_bp', 'diastolic_bp', 'temperature_c', 'spo2')
 
 
 class ReadingConflict(ValueError):
@@ -61,6 +61,8 @@ class VitalReadings:
         if not isinstance(data, dict):
             raise ValueError('Reading must be an object')
         for field in VITAL_FIELDS:
+            if field != 'heart_rate' and data.get(field) is None:
+                continue
             expected = (int, float) if field == 'temperature_c' else (int,)
             if type(data.get(field)) not in expected or not math.isfinite(data[field]):
                 raise ValueError(f'Invalid {field} type or nonfinite value')
@@ -70,7 +72,7 @@ class VitalReadings:
         if measured_epoch > received_epoch:
             raise ValueError('Future measurement is not accepted')
         received_at = datetime.fromtimestamp(received_epoch, timezone.utc).isoformat()
-        values = tuple(data[f] for f in VITAL_FIELDS)
+        values = tuple(data.get(f) for f in VITAL_FIELDS)
 
         for attempt in range(1, self.write_policy.max_attempts + 1):
             try:
@@ -86,9 +88,9 @@ class VitalReadings:
                             raise ReadingConflict('reading_id already used for another payload')
                         return {'status': 'duplicate', 'id': previous['id'], 'reading_id': reading_id, 'attempts': attempt}
                     cursor = conn.execute('''INSERT INTO vital_readings
-                        (reading_id,profile_id,scenario,heart_rate,systolic_bp,
+                        (reading_id,profile_id,scenario,heart_rate,systolic_bp,diastolic_bp,
                          temperature_c,spo2,measured_at,measured_at_epoch,received_at,received_at_epoch)
-                        VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)''',
                         (reading_id, profile_id, scenario, *values, measured_at, measured_epoch,
                          received_at, received_epoch))
                     row_id = cursor.lastrowid

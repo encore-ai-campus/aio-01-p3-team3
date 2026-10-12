@@ -142,16 +142,16 @@ def test_get_device_status_returns_copy() -> None:
 def test_capture_cctv_supports_every_mock_profile(profile_id: str) -> None:
     result = capture_cctv(profile_id, "normal")
 
-    assert result == {"image_path": "assets/cctv/normal.jpg"}
+    assert result == {"image_path": "assets/cctv/normal.png"}
 
 
 @pytest.mark.parametrize(
     ("scenario", "expected_path"),
     [
-        ("normal", "assets/cctv/normal.jpg"),
-        ("heat", "assets/cctv/normal.jpg"),
-        ("induction", "assets/cctv/kitchen_empty.jpg"),
-        ("fall", "assets/cctv/fall.jpg"),
+        ("normal", "assets/cctv/normal.png"),
+        ("heat", "assets/cctv/normal.png"),
+        ("induction", "assets/cctv/kitchen_empty.png"),
+        ("fall", "assets/cctv/fall.png"),
     ],
 )
 def test_capture_cctv_returns_scenario_image(
@@ -178,7 +178,7 @@ def test_capture_cctv_returns_new_mapping() -> None:
     second = capture_cctv("profile-01", "fall")
     first["image_path"] = "changed.jpg"
 
-    assert second == {"image_path": "assets/cctv/fall.jpg"}
+    assert second == {"image_path": "assets/cctv/fall.png"}
 
 
 @pytest.mark.parametrize("area", HOSPITALS_BY_AREA)
@@ -327,11 +327,11 @@ def test_analyze_cctv_delegates_to_haedeun_function(monkeypatch) -> None:
         raising=False,
     )
 
-    result = analyze_cctv("assets/cctv/fall.jpg")
+    result = analyze_cctv("assets/cctv/fall.png")
 
-    assert received_paths == ["assets/cctv/fall.jpg"]
+    assert received_paths == ["assets/cctv/fall.png"]
     assert result == {
-        "image_path": "assets/cctv/fall.jpg",
+        "image_path": "assets/cctv/fall.png",
         "person_visible": True,
         "posture": "fallen",
         "fall_suspected": True,
@@ -356,7 +356,7 @@ def test_analyze_cctv_reports_missing_haedeun_function(monkeypatch) -> None:
     monkeypatch.delattr(analyzer, "analyze_cctv_or_unavailable", raising=False)
 
     with pytest.raises(RuntimeError, match="아직 구현되지 않았습니다"):
-        analyze_cctv("assets/cctv/fall.jpg")
+        analyze_cctv("assets/cctv/fall.png")
 
 
 def test_analyze_cctv_rejects_non_mapping_result(monkeypatch) -> None:
@@ -368,7 +368,7 @@ def test_analyze_cctv_rejects_non_mapping_result(monkeypatch) -> None:
     )
 
     with pytest.raises(TypeError, match="분석 결과는 dict"):
-        analyze_cctv("assets/cctv/fall.jpg")
+        analyze_cctv("assets/cctv/fall.png")
 
 
 def test_analyze_cctv_rejects_missing_result_fields(monkeypatch) -> None:
@@ -385,7 +385,7 @@ def test_analyze_cctv_rejects_missing_result_fields(monkeypatch) -> None:
     )
 
     with pytest.raises(ValueError, match="필수 필드가 없습니다: description"):
-        analyze_cctv("assets/cctv/fall.jpg")
+        analyze_cctv("assets/cctv/fall.png")
 
 
 def test_analyze_cctv_rejects_different_result_path(monkeypatch) -> None:
@@ -393,7 +393,7 @@ def test_analyze_cctv_rejects_different_result_path(monkeypatch) -> None:
         analyzer,
         "analyze_cctv_or_unavailable",
         lambda _image_path: {
-            "image_path": "assets/cctv/other.jpg",
+            "image_path": "assets/cctv/other.png",
             "person_visible": False,
             "posture": "none",
             "fall_suspected": False,
@@ -404,7 +404,7 @@ def test_analyze_cctv_rejects_different_result_path(monkeypatch) -> None:
     )
 
     with pytest.raises(ValueError, match="image_path가 요청값과 다릅니다"):
-        analyze_cctv("assets/cctv/fall.jpg")
+        analyze_cctv("assets/cctv/fall.png")
 
 
 def test_analyze_cctv_rejects_invalid_posture(monkeypatch) -> None:
@@ -422,7 +422,7 @@ def test_analyze_cctv_rejects_invalid_posture(monkeypatch) -> None:
     )
 
     with pytest.raises(ValueError, match="지원하지 않는 CCTV posture"):
-        analyze_cctv("assets/cctv/fall.jpg")
+        analyze_cctv("assets/cctv/fall.png")
 
 
 def test_analyze_cctv_rejects_non_numeric_confidence(monkeypatch) -> None:
@@ -440,7 +440,7 @@ def test_analyze_cctv_rejects_non_numeric_confidence(monkeypatch) -> None:
     )
 
     with pytest.raises(TypeError, match="confidence는 숫자"):
-        analyze_cctv("assets/cctv/fall.jpg")
+        analyze_cctv("assets/cctv/fall.png")
 
 
 def test_analyze_cctv_allows_missing_optional_confidence(monkeypatch) -> None:
@@ -456,7 +456,7 @@ def test_analyze_cctv_allows_missing_optional_confidence(monkeypatch) -> None:
         raising=False,
     )
 
-    result = analyze_cctv("assets/cctv/normal.jpg")
+    result = analyze_cctv("assets/cctv/normal.png")
 
     assert "confidence" not in result
     assert result["summary"] == "영상에서 사람을 확인할 수 없습니다."
@@ -478,4 +478,4 @@ def test_analyze_cctv_rejects_out_of_range_confidence(monkeypatch) -> None:
     )
 
     with pytest.raises(ValueError, match="0부터 1 사이"):
-        analyze_cctv("assets/cctv/normal.jpg")
+        analyze_cctv("assets/cctv/normal.png")

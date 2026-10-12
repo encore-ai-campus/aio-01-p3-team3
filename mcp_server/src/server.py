@@ -21,7 +21,7 @@ load_dotenv(PROJECT_DIR / "config" / ".env")
 
 MCP_HOST = os.getenv("MCP_HOST", "0.0.0.0")
 MCP_PORT = int(os.getenv("MCP_PORT", "8010"))
-CCTV_ASSET_DIR = Path(__file__).resolve().parent / "assets" / "cctv"
+CCTV_ASSET_DIR = Path(__file__).resolve().parent.parent / "assets" / "cctv"
 CCTV_IMAGE_NAMES = {
     Path(str(data["cctv_image_path"])).name
     for data in SCENARIOS.values()
