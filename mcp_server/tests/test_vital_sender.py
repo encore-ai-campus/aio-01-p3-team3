@@ -66,6 +66,7 @@ def test_build_payload_uses_existing_vital_contract() -> None:
 
     assert payload == {
         "profile_id": "profile-01",
+        "scenario": "fall",
         "heart_rate": 118,
         "systolic_bp": 120,
         "temperature_c": 36.4,

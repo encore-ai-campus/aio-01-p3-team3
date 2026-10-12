@@ -98,6 +98,7 @@ def build_vital_payload(
     if timestamp.tzinfo is None:
         timestamp = timestamp.astimezone()
 
+    vital["scenario"] = scenario
     vital["profile_id"] = profile_id
     vital["measured_at"] = timestamp.isoformat(timespec="seconds")
     return vital
