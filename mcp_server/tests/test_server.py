@@ -48,7 +48,25 @@ def test_cctv_route_rejects_unknown_name() -> None:
     assert json.loads(response.body)["error"] == "CCTV_IMAGE_NOT_FOUND"
 
 
-def test_cctv_route_reports_missing_allowed_image() -> None:
+def test_cctv_asset_dir_points_to_real_images() -> None:
+    expected = Path(__file__).resolve().parents[1] / "assets" / "cctv"
+
+    assert server.CCTV_ASSET_DIR == expected
+    for name in server.CCTV_IMAGE_NAMES:
+        assert (expected / name).is_file(), name
+
+
+def test_cctv_route_serves_every_scenario_image() -> None:
+    for name in server.CCTV_IMAGE_NAMES:
+        request = SimpleNamespace(path_params={"name": name})
+        response = asyncio.run(server.get_cctv_image(request))
+
+        assert isinstance(response, FileResponse), name
+        assert Path(response.path) == server.CCTV_ASSET_DIR / name
+
+
+def test_cctv_route_reports_missing_allowed_image(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(server, "CCTV_ASSET_DIR", tmp_path)
     request = SimpleNamespace(path_params={"name": "fall.jpg"})
     response = asyncio.run(server.get_cctv_image(request))
 
@@ -57,6 +75,12 @@ def test_cctv_route_reports_missing_allowed_image() -> None:
         "error": "CCTV_IMAGE_NOT_READY",
         "name": "fall.jpg",
     }
+
+
+def test_dockerfile_copies_cctv_assets() -> None:
+    dockerfile = Path(__file__).resolve().parents[1] / "deploy" / "Dockerfile"
+
+    assert "COPY assets/ ./assets/" in dockerfile.read_text(encoding="utf-8")
 
 
 def test_cctv_route_serves_allowed_file(monkeypatch) -> None:
