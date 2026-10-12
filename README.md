@@ -1040,7 +1040,7 @@ docker compose up --build
 
 | 항목                | 링크 |
 | ------------------- | ---- |
-| 배포 URL            |      |
-| 저장소 URL          |      |
-| 파이프라인 실행 URL |      |
-| 시연 영상           |      |
+| 배포 URL            | http://54.180.32.22:8501 (보호자 대시보드, 데모 계정으로 로그인) |
+| 저장소 URL          | 제출: https://github.com/encore-ai-campus/aio-01-p3-team3 · 개발: https://github.com/ensk712-rgb/aio-01-p3-team3 |
+| 파이프라인 실행 URL | https://github.com/ensk712-rgb/aio-01-p3-team3/actions (워크플로 3개: Backend CI CD · Frontend CI CD · MCP Server CI CD) |
+| 시연 영상           | 기입 필요 (촬영 후 링크 추가) |
