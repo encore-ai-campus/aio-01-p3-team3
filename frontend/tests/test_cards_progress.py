@@ -78,7 +78,7 @@ def test_cards_and_progress_show_this_run_immediately(monkeypatch):
     assert metrics["심박"] == "80 bpm" and metrics["실내 온도"] == "26.0 ℃" and metrics["습도"] == "55 %"
     assert any("인덕션: **켜짐 · 120분 · 300℃**" in m.value for m in after.markdown)
     assert any("위험 판정: 이상 없음" in m.value for m in after.markdown)   # 진행 표시
-    assert any(c.value == "이상 없음" for c in after.caption)
+    assert any('care-progress-label' in item.value and '이상 없음' in item.value for item in after.markdown)
 
 
 def test_missing_vital_shows_sensor_warning(monkeypatch):

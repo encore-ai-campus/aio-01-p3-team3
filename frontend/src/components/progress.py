@@ -54,4 +54,4 @@ def render_progress(run_response: Mapping | None, approval_result: Mapping | Non
         f'<span style="color:#5f6368;margin-right:8px;">진행</span>{arrow.join(chips)}</div>',
         unsafe_allow_html=True,
     )
-    st.caption(label)
+    st.markdown(f'<div class="care-progress-label">{escape(label)}</div>', unsafe_allow_html=True)
