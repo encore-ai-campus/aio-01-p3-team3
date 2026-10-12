@@ -1,0 +1,3505 @@
+{
+  "executed_at": "2026-10-12T15:57:46.100984+09:00",
+  "base_revision": "b1e9b0b987d028bc1763b5891be59656946de45a",
+  "scope": "Local ASGI TestClient + real temporary SQLite; MCP/LLM stubs",
+  "source_sha256": {
+    "backend\\src\\__init__.py": "d8369d08b20ccd2b6aa404b5d4925c92c418c439c233e0f647227f459d94792e",
+    "backend\\src\\agents\\__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "backend\\src\\agents\\emergency.py": "3b40c78a8fae25e47ca634f5ee8c1f4498a9dfa0f65cad0c7ccac292b11f5852",
+    "backend\\src\\agents\\iot.py": "96e6570dd9f63d06c859cc6376aa167755c61b8710ab48dd6a214c40e15e3d64",
+    "backend\\src\\agents\\profile.py": "d8e6ceb1bedd50465e0ac04d08c0bda488212bef182cddea79b672b6a4736403",
+    "backend\\src\\agents\\summary.py": "2a0d2521ab422470f9cdd6ddc5b91cc3c29e9ddf9b77cb2fd4d9b598bbbe886a",
+    "backend\\src\\agents\\vital.py": "bead19abe60f3e8544c3ea15c63defaaeee154a945ffaf9660e0ab85def5ead8",
+    "backend\\src\\db\\__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "backend\\src\\db\\database.py": "6a45fd2bf6f21905e53393b6008c4254b05993cb117d64cdfa042de82aa1d46b",
+    "backend\\src\\db\\device_states.py": "7b0cf67cf19ce49af727adcb1a79ee01cb3c97bd2fed137cc7657fc597362fa2",
+    "backend\\src\\db\\migrations.py": "661d1a8dbc7798e5cc396d2bd3a9830ce3ed3812cf55c2a61fc5632f85126e17",
+    "backend\\src\\db\\seed.py": "42f8080f566abf91e2690faf63bdbb2391770adf0351f1fad9c956ff4f87a9ae",
+    "backend\\src\\db\\vital_readings.py": "8c2ebc6c93b416eed73de43e7970b9dd0a9faaccb6fda8b089cb697eadba7717",
+    "backend\\src\\db\\vital_service.py": "edd508acc1709d70f8e8629f3f759ab8d49be8752fab7b85c786ce51dc5d1624",
+    "backend\\src\\healing\\__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "backend\\src\\healing\\experiment.py": "eca4fd317396d836674ee101f214b3d616a46900f637b1db18206eccd507e4e0",
+    "backend\\src\\healing\\faults.py": "c84979ab27ef66f53425af1bc6ea9bfe67c06531ccc4646c65dae3d0f89ceeda",
+    "backend\\src\\healing\\metrics.py": "044990a813591b8f00034bcc29de48b6d22a70f2da4407c4e5c44261f1a727c0",
+    "backend\\src\\healing\\retry.py": "f5a51f1da93ba7ed9b4798a313a627e4e62a562e0ed6abf3f8ca31101ea3c487",
+    "backend\\src\\healing\\vital.py": "c238edef9871d334b8147a3f07e39cae978a2c2088f3541e4ccc94376aa8bda3",
+    "backend\\src\\llm\\__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "backend\\src\\llm\\client.py": "1bf71321a7662ed5c00e30afb9a8d1200330e15d226f785198d052a92eda4287",
+    "backend\\src\\llm\\fallback.py": "dd50ff5278444e2f4b7b40f3610e97a2a6e7969c134cfc360a030a79c704df13",
+    "backend\\src\\llm\\prompts.py": "cca16670c2c609cc0f52841dada7641c75137cdbc1f96712621eb1c97c27b849",
+    "backend\\src\\main.py": "afa8565d15059b561e0d6bcd855a5a105b4aebe01efa9f3fecb03c290a8a984b",
+    "backend\\src\\mcp_client.py": "f7f385a034d425af75a646a05f7d7bc99b361a045cc21126322e78b7e56ecda3",
+    "backend\\src\\orchestrator\\__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "backend\\src\\orchestrator\\approval.py": "1eda002e08b0d51bfc07454052598fb3a07ce5f29940c2a54f914a0f12a97f38",
+    "backend\\src\\orchestrator\\approval_flow.py": "85b55c848a0a7a0b888dcd693b65a153f3fec9282b5b8844923be052499c86c8",
+    "backend\\src\\orchestrator\\auto_119.py": "617de8e80ac4501970509722a02032e0b26cfbd370a3e2e87bac159d366eadbb",
+    "backend\\src\\orchestrator\\care.py": "943a1384f10c9a2e988184a73def7290c5c30b5f7893b7c8968953dee0cfc42e",
+    "backend\\src\\orchestrator\\emergency.py": "cebf66036a8500807bf5da5cea47115418446c0468e59ba07e2b971cb90abfb7",
+    "backend\\src\\orchestrator\\guards.py": "aeaddcf35dc5a7f95d39dd54d17d51d4cdc1c2481779da7a330cba077baa8d56",
+    "backend\\src\\orchestrator\\monitoring.py": "182bffa5fdef6368322e9ef5c23ffa51d6aee20ce224487ed019f0aed0b1dd21",
+    "backend\\src\\orchestrator\\validation.py": "82519cbfe61567d194b7f1fa610fcb0eb3452294b9f5e5dd4f7c1aa470cb38eb",
+    "backend\\src\\rules\\__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "backend\\src\\rules\\risk.py": "2bb09f169aa7f8b9ba8cff035ce9fd5453376cfee366c0a863867f2b81d6db82",
+    "backend\\src\\schemas.py": "342fde6c904927930f640d91c6a229b2c73418bb6d2dcb0b8309ae909736f7f3"
+  },
+  "repeats": 3,
+  "metrics": {
+    "total_records": 12,
+    "completed_fault_cases": 12,
+    "recovered_cases": 6,
+    "recovery_rate_percent": 50.0,
+    "mean_recovered_technical_flow_ms": 856.2161666666666,
+    "outcomes": {
+      "degraded": 3,
+      "failed": 3,
+      "recovered": 6,
+      "safe_stop": 0
+    }
+  },
+  "records": [
+    {
+      "case_id": "DR-VITAL-01-1",
+      "scenario_id": "DR-VITAL-01",
+      "scenario": "heat",
+      "fault": "vital",
+      "fault_injected": true,
+      "outcome": "recovered",
+      "recovery": "cache",
+      "expected_behavior_passed": true,
+      "technical_flow_ms": 1583.205,
+      "run_id": "run-0d066b9c",
+      "care_response": {
+        "run_id": "run-0d066b9c",
+        "status": "pending_approval",
+        "current_step": "바이탈 확인 → IoT·CCTV 확인 → 위험 판정 완료(경고) → 보호자 승인 대기",
+        "care_status": {
+          "run_id": "run-0d066b9c",
+          "profile_id": "profile-02",
+          "scenario": "heat",
+          "attempt": 1,
+          "vital": {
+            "heart_rate": 105,
+            "systolic_bp": 140,
+            "temperature_c": 37.8,
+            "spo2": 96,
+            "measured_at": "2026-10-12T06:57:32.152928Z"
+          },
+          "indoor_environment": {
+            "temperature_c": 33.0,
+            "humidity_percent": 75.0
+          },
+          "devices": {
+            "air_conditioner": "off",
+            "induction": "off",
+            "induction_minutes": null,
+            "induction_temperature": null
+          },
+          "cctv": {
+            "image_path": "assets/cctv/normal.png",
+            "summary": null,
+            "person_visible": true,
+            "posture": "sitting",
+            "fall_suspected": false,
+            "confidence": 0.9,
+            "description": "시연 관찰 결과",
+            "status": "analyzed"
+          },
+          "vulnerability": "중",
+          "area": "서울시 송파구",
+          "source": "cache",
+          "errors": []
+        },
+        "emergency": {
+          "run_id": "run-0d066b9c",
+          "risk_level": "경고",
+          "reasons": [
+            "심박·혈압 변화",
+            "실내 온도 극한",
+            "이전 측정값 사용"
+          ],
+          "axes": {
+            "fall": "정상",
+            "cardio": "주의",
+            "respiratory": "정상",
+            "environment": "경고"
+          },
+          "fall_state": "none",
+          "auto_119": null,
+          "proposed_actions": [
+            {
+              "tool": "control_device",
+              "description": "에어컨 냉방 26℃로 켜기",
+              "arguments": {
+                "device": "aircon",
+                "action": "cool"
+              },
+              "needs_approval": true
+            },
+            {
+              "tool": "notify_guardian",
+              "description": "보호자에게 상황 알림",
+              "arguments": {
+                "message": "실내 온도 극한 + 심박·혈압 변화 + 이전 측정값 사용"
+              },
+              "needs_approval": false
+            }
+          ],
+          "requires_approval": true,
+          "cctv_summary": "시연 관찰 결과"
+        },
+        "message": "실내 온도 극한 + 심박·혈압 변화 + 이전 측정값 사용",
+        "approved": null,
+        "decided_by": null,
+        "actions": [],
+        "guardian_message": null,
+        "elder_message": null
+      },
+      "final_response": {
+        "run_id": "run-0d066b9c",
+        "status": "done",
+        "current_step": "보호자 승인 → Action 실행 → Summary 안내 완료",
+        "actions": [
+          {
+            "tool": "control_device",
+            "status": "success",
+            "message": "Mock 실행 완료",
+            "recovery": null
+          },
+          {
+            "tool": "notify_guardian",
+            "status": "success",
+            "message": "Mock 실행 완료",
+            "recovery": null
+          }
+        ],
+        "guardian_message": "승인하신 조치(에어컨 냉방 26℃로 켜기)를 실행했습니다. 위험도 경고. 잠시 뒤 어르신 상태를 한 번 더 확인해 주세요.",
+        "elder_message": "어르신, 시원하게 에어컨을 켜 두었어요. 물 한 잔 천천히 드세요.",
+        "approved": true,
+        "decided_by": "guardian"
+      },
+      "logs": [
+        {
+          "id": 6,
+          "run_id": "run-0d066b9c",
+          "step": "vital",
+          "attempt": 1,
+          "status": "retry",
+          "error": "InjectedFault",
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:33.230983+00:00"
+        },
+        {
+          "id": 7,
+          "run_id": "run-0d066b9c",
+          "step": "iot_env",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:33.237659+00:00"
+        },
+        {
+          "id": 8,
+          "run_id": "run-0d066b9c",
+          "step": "iot_devices",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:33.242802+00:00"
+        },
+        {
+          "id": 9,
+          "run_id": "run-0d066b9c",
+          "step": "vision",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:33.250096+00:00"
+        },
+        {
+          "id": 10,
+          "run_id": "run-0d066b9c",
+          "step": "vital",
+          "attempt": 2,
+          "status": "retry",
+          "error": "InjectedFault",
+          "recovery": null,
+          "elapsed_ms": 500,
+          "created_at": "2026-10-12T06:57:33.728716+00:00"
+        },
+        {
+          "id": 11,
+          "run_id": "run-0d066b9c",
+          "step": "vital",
+          "attempt": 3,
+          "status": "fail",
+          "error": "InjectedFault",
+          "recovery": null,
+          "elapsed_ms": 1516,
+          "created_at": "2026-10-12T06:57:34.741496+00:00"
+        },
+        {
+          "id": 12,
+          "run_id": "run-0d066b9c",
+          "step": "vital",
+          "attempt": 3,
+          "status": "fallback",
+          "error": null,
+          "recovery": "cache",
+          "elapsed_ms": 1516,
+          "created_at": "2026-10-12T06:57:34.751687+00:00"
+        },
+        {
+          "id": 13,
+          "run_id": "run-0d066b9c",
+          "step": "llm",
+          "attempt": 1,
+          "status": "fallback",
+          "error": null,
+          "recovery": "template",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:34.766357+00:00"
+        },
+        {
+          "id": 14,
+          "run_id": "run-0d066b9c",
+          "step": "action:control_device",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:34.779254+00:00"
+        },
+        {
+          "id": 15,
+          "run_id": "run-0d066b9c",
+          "step": "summary",
+          "attempt": 1,
+          "status": "fallback",
+          "error": null,
+          "recovery": "template",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:34.788556+00:00"
+        },
+        {
+          "id": 16,
+          "run_id": "run-0d066b9c",
+          "step": "action:notify_guardian",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:34.794431+00:00"
+        },
+        {
+          "id": 17,
+          "run_id": "run-0d066b9c",
+          "step": "approval",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": "approved",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:34.801364+00:00"
+        }
+      ],
+      "provider_calls": [
+        "get_indoor_env",
+        "get_device_status",
+        "capture_cctv",
+        "analyze_cctv",
+        "find_hospital",
+        "control_device",
+        "notify_guardian"
+      ]
+    },
+    {
+      "case_id": "DR-IOT-01-1",
+      "scenario_id": "DR-IOT-01",
+      "scenario": "heat",
+      "fault": "iot",
+      "fault_injected": true,
+      "outcome": "failed",
+      "recovery": null,
+      "expected_behavior_passed": true,
+      "technical_flow_ms": 1627.203,
+      "run_id": "run-d08f0f18",
+      "care_response": {
+        "run_id": "run-d08f0f18",
+        "status": "pending_approval",
+        "current_step": "바이탈 확인 → IoT·CCTV 확인 → 위험 판정 완료(경고) → 보호자 승인 대기",
+        "care_status": {
+          "run_id": "run-d08f0f18",
+          "profile_id": "profile-02",
+          "scenario": "heat",
+          "attempt": 1,
+          "vital": {
+            "heart_rate": 105,
+            "systolic_bp": 140,
+            "temperature_c": 37.8,
+            "spo2": 96,
+            "measured_at": "2026-10-12T06:57:33.858471Z"
+          },
+          "indoor_environment": {
+            "temperature_c": 33.0,
+            "humidity_percent": 75.0
+          },
+          "devices": {
+            "air_conditioner": "off",
+            "induction": "off",
+            "induction_minutes": null,
+            "induction_temperature": null
+          },
+          "cctv": {
+            "image_path": "assets/cctv/normal.png",
+            "summary": null,
+            "person_visible": true,
+            "posture": "sitting",
+            "fall_suspected": false,
+            "confidence": 0.9,
+            "description": "시연 관찰 결과",
+            "status": "analyzed"
+          },
+          "vulnerability": "중",
+          "area": "서울시 송파구",
+          "source": "live",
+          "errors": []
+        },
+        "emergency": {
+          "run_id": "run-d08f0f18",
+          "risk_level": "경고",
+          "reasons": [
+            "심박·혈압 변화",
+            "실내 온도 극한"
+          ],
+          "axes": {
+            "fall": "정상",
+            "cardio": "주의",
+            "respiratory": "정상",
+            "environment": "경고"
+          },
+          "fall_state": "none",
+          "auto_119": null,
+          "proposed_actions": [
+            {
+              "tool": "control_device",
+              "description": "에어컨 냉방 26℃로 켜기",
+              "arguments": {
+                "device": "aircon",
+                "action": "cool"
+              },
+              "needs_approval": true
+            },
+            {
+              "tool": "notify_guardian",
+              "description": "보호자에게 상황 알림",
+              "arguments": {
+                "message": "실내 온도 극한 + 심박·혈압 변화"
+              },
+              "needs_approval": false
+            }
+          ],
+          "requires_approval": true,
+          "cctv_summary": "시연 관찰 결과"
+        },
+        "message": "실내 온도 극한 + 심박·혈압 변화",
+        "approved": null,
+        "decided_by": null,
+        "actions": [],
+        "guardian_message": null,
+        "elder_message": null
+      },
+      "final_response": {
+        "run_id": "run-d08f0f18",
+        "status": "done",
+        "current_step": "보호자 승인 → Action 실행 → Summary 안내 완료",
+        "actions": [
+          {
+            "tool": "control_device",
+            "status": "failed",
+            "message": "control_device Mock 실행에 실패했습니다.",
+            "recovery": "3회 시도 후 실패"
+          },
+          {
+            "tool": "notify_guardian",
+            "status": "success",
+            "message": "Mock 실행 완료",
+            "recovery": null
+          }
+        ],
+        "guardian_message": "에어컨 냉방 26℃로 켜기에 실패했습니다. 직접 조치가 필요합니다. 위험도 경고. 지금 바로 어르신께 연락하세요.",
+        "elder_message": "어르신, 에어컨이 켜지지 않았어요. 창문을 열고 물을 자주 드세요.",
+        "approved": true,
+        "decided_by": "guardian"
+      },
+      "logs": [
+        {
+          "id": 1,
+          "run_id": "run-d08f0f18",
+          "step": "iot_env",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:34.876297+00:00"
+        },
+        {
+          "id": 2,
+          "run_id": "run-d08f0f18",
+          "step": "iot_devices",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:34.883824+00:00"
+        },
+        {
+          "id": 3,
+          "run_id": "run-d08f0f18",
+          "step": "vision",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:34.888998+00:00"
+        },
+        {
+          "id": 4,
+          "run_id": "run-d08f0f18",
+          "step": "vital",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 31,
+          "created_at": "2026-10-12T06:57:34.902903+00:00"
+        },
+        {
+          "id": 5,
+          "run_id": "run-d08f0f18",
+          "step": "llm",
+          "attempt": 1,
+          "status": "fallback",
+          "error": null,
+          "recovery": "template",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:34.911178+00:00"
+        },
+        {
+          "id": 6,
+          "run_id": "run-d08f0f18",
+          "step": "action:control_device",
+          "attempt": 1,
+          "status": "retry",
+          "error": "InjectedFault",
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:34.923787+00:00"
+        },
+        {
+          "id": 7,
+          "run_id": "run-d08f0f18",
+          "step": "action:control_device",
+          "attempt": 2,
+          "status": "retry",
+          "error": "InjectedFault",
+          "recovery": null,
+          "elapsed_ms": 516,
+          "created_at": "2026-10-12T06:57:35.442969+00:00"
+        },
+        {
+          "id": 8,
+          "run_id": "run-d08f0f18",
+          "step": "action:control_device",
+          "attempt": 3,
+          "status": "fail",
+          "error": "InjectedFault",
+          "recovery": null,
+          "elapsed_ms": 1547,
+          "created_at": "2026-10-12T06:57:36.466194+00:00"
+        },
+        {
+          "id": 9,
+          "run_id": "run-d08f0f18",
+          "step": "summary",
+          "attempt": 1,
+          "status": "fallback",
+          "error": null,
+          "recovery": "template",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:36.476786+00:00"
+        },
+        {
+          "id": 10,
+          "run_id": "run-d08f0f18",
+          "step": "action:notify_guardian",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:36.484640+00:00"
+        },
+        {
+          "id": 11,
+          "run_id": "run-d08f0f18",
+          "step": "approval",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": "approved",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:36.491048+00:00"
+        }
+      ],
+      "provider_calls": [
+        "get_indoor_env",
+        "get_device_status",
+        "capture_cctv",
+        "analyze_cctv",
+        "find_hospital",
+        "notify_guardian"
+      ]
+    },
+    {
+      "case_id": "DR-VISION-01-1",
+      "scenario_id": "DR-VISION-01",
+      "scenario": "critical",
+      "fault": "vision",
+      "fault_injected": true,
+      "outcome": "degraded",
+      "recovery": null,
+      "expected_behavior_passed": true,
+      "technical_flow_ms": 575.164,
+      "run_id": "run-6b337377",
+      "care_response": {
+        "run_id": "run-6b337377",
+        "status": "done",
+        "current_step": "바이탈 확인 → 위험 판정(바이탈 매우 위험) → 119 자동 연결(mock) → 보호자 긴급 알림",
+        "care_status": {
+          "run_id": "run-6b337377",
+          "profile_id": "profile-02",
+          "scenario": "critical",
+          "attempt": 1,
+          "vital": {
+            "heart_rate": 140,
+            "systolic_bp": 85,
+            "temperature_c": 36.0,
+            "spo2": 88,
+            "measured_at": "2026-10-12T06:57:35.544317Z"
+          },
+          "indoor_environment": {
+            "temperature_c": 25.0,
+            "humidity_percent": 50.0
+          },
+          "devices": {
+            "air_conditioner": "off",
+            "induction": "off",
+            "induction_minutes": null,
+            "induction_temperature": null
+          },
+          "cctv": {
+            "image_path": "assets/cctv/lying.png",
+            "summary": null,
+            "person_visible": null,
+            "posture": null,
+            "fall_suspected": null,
+            "confidence": null,
+            "description": "영상 판단 불가",
+            "status": "failed"
+          },
+          "vulnerability": "중",
+          "area": "서울시 송파구",
+          "source": "live",
+          "errors": [
+            "cctv_failed"
+          ]
+        },
+        "emergency": {
+          "run_id": "run-6b337377",
+          "risk_level": "위급",
+          "reasons": [
+            "위험 범위 항목 2개 이상",
+            "심박·혈압 위험 범위",
+            "산소포화도 위험 범위",
+            "체온 변화",
+            "영상 판단 불가"
+          ],
+          "axes": {
+            "fall": "정상",
+            "cardio": "경고",
+            "respiratory": "경고",
+            "environment": "주의"
+          },
+          "fall_state": "none",
+          "auto_119": "VITAL_SEVERE",
+          "proposed_actions": [
+            {
+              "tool": "call_119",
+              "description": "119 바로 연결",
+              "arguments": {
+                "message": "심박·혈압 위험 범위 + 산소포화도 위험 범위 + 체온 변화 + 영상 판단 불가"
+              },
+              "needs_approval": false
+            },
+            {
+              "tool": "find_hospital",
+              "description": "가까운 병원 정보 안내",
+              "arguments": {
+                "area": "서울시 송파구"
+              },
+              "needs_approval": false
+            },
+            {
+              "tool": "notify_guardian",
+              "description": "보호자에게 상황 알림",
+              "arguments": {
+                "message": "심박·혈압 위험 범위 + 산소포화도 위험 범위 + 체온 변화 + 영상 판단 불가"
+              },
+              "needs_approval": false
+            }
+          ],
+          "requires_approval": false,
+          "cctv_summary": "영상 판단 불가"
+        },
+        "message": "[긴급] 바이탈 여러 항목이 매우 위험해 119에 바로 연락했습니다. 판정 근거: 심박·혈압 위험 범위 + 산소포화도 위험 범위 + 체온 변화 + 영상 판단 불가. CCTV 판단이 안 돼 원본 캡처를 직접 확인하세요. 가까운 응급실: 시연병원 (1.2km). 지금 바로 어르신께 전화하세요.",
+        "approved": null,
+        "decided_by": "auto",
+        "actions": [
+          {
+            "tool": "call_119",
+            "status": "success",
+            "message": "Mock 실행 완료",
+            "recovery": null
+          },
+          {
+            "tool": "notify_guardian",
+            "status": "success",
+            "message": "Mock 실행 완료",
+            "recovery": null
+          }
+        ],
+        "guardian_message": "바이탈 여러 항목이 매우 위험해 119에 바로 연락했습니다. 가까운 응급실: 시연병원 (1.2km). 지금 바로 어르신께 전화해 상태를 확인하세요.",
+        "elder_message": "어르신, 구급대가 오고 있어요. 보호자분께도 알렸어요. 움직이지 말고 그대로 계세요."
+      },
+      "final_response": {
+        "run_id": "run-6b337377",
+        "status": "done",
+        "current_step": "바이탈 확인 → 위험 판정(바이탈 매우 위험) → 119 자동 연결(mock) → 보호자 긴급 알림",
+        "care_status": {
+          "run_id": "run-6b337377",
+          "profile_id": "profile-02",
+          "scenario": "critical",
+          "attempt": 1,
+          "vital": {
+            "heart_rate": 140,
+            "systolic_bp": 85,
+            "temperature_c": 36.0,
+            "spo2": 88,
+            "measured_at": "2026-10-12T06:57:35.544317Z"
+          },
+          "indoor_environment": {
+            "temperature_c": 25.0,
+            "humidity_percent": 50.0
+          },
+          "devices": {
+            "air_conditioner": "off",
+            "induction": "off",
+            "induction_minutes": null,
+            "induction_temperature": null
+          },
+          "cctv": {
+            "image_path": "assets/cctv/lying.png",
+            "summary": null,
+            "person_visible": null,
+            "posture": null,
+            "fall_suspected": null,
+            "confidence": null,
+            "description": "영상 판단 불가",
+            "status": "failed"
+          },
+          "vulnerability": "중",
+          "area": "서울시 송파구",
+          "source": "live",
+          "errors": [
+            "cctv_failed"
+          ]
+        },
+        "emergency": {
+          "run_id": "run-6b337377",
+          "risk_level": "위급",
+          "reasons": [
+            "위험 범위 항목 2개 이상",
+            "심박·혈압 위험 범위",
+            "산소포화도 위험 범위",
+            "체온 변화",
+            "영상 판단 불가"
+          ],
+          "axes": {
+            "fall": "정상",
+            "cardio": "경고",
+            "respiratory": "경고",
+            "environment": "주의"
+          },
+          "fall_state": "none",
+          "auto_119": "VITAL_SEVERE",
+          "proposed_actions": [
+            {
+              "tool": "call_119",
+              "description": "119 바로 연결",
+              "arguments": {
+                "message": "심박·혈압 위험 범위 + 산소포화도 위험 범위 + 체온 변화 + 영상 판단 불가"
+              },
+              "needs_approval": false
+            },
+            {
+              "tool": "find_hospital",
+              "description": "가까운 병원 정보 안내",
+              "arguments": {
+                "area": "서울시 송파구"
+              },
+              "needs_approval": false
+            },
+            {
+              "tool": "notify_guardian",
+              "description": "보호자에게 상황 알림",
+              "arguments": {
+                "message": "심박·혈압 위험 범위 + 산소포화도 위험 범위 + 체온 변화 + 영상 판단 불가"
+              },
+              "needs_approval": false
+            }
+          ],
+          "requires_approval": false,
+          "cctv_summary": "영상 판단 불가"
+        },
+        "message": "[긴급] 바이탈 여러 항목이 매우 위험해 119에 바로 연락했습니다. 판정 근거: 심박·혈압 위험 범위 + 산소포화도 위험 범위 + 체온 변화 + 영상 판단 불가. CCTV 판단이 안 돼 원본 캡처를 직접 확인하세요. 가까운 응급실: 시연병원 (1.2km). 지금 바로 어르신께 전화하세요.",
+        "approved": null,
+        "decided_by": "auto",
+        "actions": [
+          {
+            "tool": "call_119",
+            "status": "success",
+            "message": "Mock 실행 완료",
+            "recovery": null
+          },
+          {
+            "tool": "notify_guardian",
+            "status": "success",
+            "message": "Mock 실행 완료",
+            "recovery": null
+          }
+        ],
+        "guardian_message": "바이탈 여러 항목이 매우 위험해 119에 바로 연락했습니다. 가까운 응급실: 시연병원 (1.2km). 지금 바로 어르신께 전화해 상태를 확인하세요.",
+        "elder_message": "어르신, 구급대가 오고 있어요. 보호자분께도 알렸어요. 움직이지 말고 그대로 계세요."
+      },
+      "logs": [
+        {
+          "id": 1,
+          "run_id": "run-6b337377",
+          "step": "iot_env",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:36.562003+00:00"
+        },
+        {
+          "id": 2,
+          "run_id": "run-6b337377",
+          "step": "iot_devices",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:36.568113+00:00"
+        },
+        {
+          "id": 3,
+          "run_id": "run-6b337377",
+          "step": "vision",
+          "attempt": 1,
+          "status": "retry",
+          "error": "InjectedFault",
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:36.573922+00:00"
+        },
+        {
+          "id": 4,
+          "run_id": "run-6b337377",
+          "step": "vital",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 31,
+          "created_at": "2026-10-12T06:57:36.586106+00:00"
+        },
+        {
+          "id": 5,
+          "run_id": "run-6b337377",
+          "step": "vision",
+          "attempt": 2,
+          "status": "fail",
+          "error": "InjectedFault",
+          "recovery": null,
+          "elapsed_ms": 515,
+          "created_at": "2026-10-12T06:57:37.086715+00:00"
+        },
+        {
+          "id": 6,
+          "run_id": "run-6b337377",
+          "step": "llm",
+          "attempt": 1,
+          "status": "fallback",
+          "error": null,
+          "recovery": "template",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:37.097433+00:00"
+        },
+        {
+          "id": 7,
+          "run_id": "run-6b337377",
+          "step": "action:call_119",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:37.103605+00:00"
+        },
+        {
+          "id": 8,
+          "run_id": "run-6b337377",
+          "step": "action:notify_guardian",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:37.109847+00:00"
+        },
+        {
+          "id": 9,
+          "run_id": "run-6b337377",
+          "step": "summary",
+          "attempt": 1,
+          "status": "fallback",
+          "error": null,
+          "recovery": "template",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:37.116959+00:00"
+        },
+        {
+          "id": 10,
+          "run_id": "run-6b337377",
+          "step": "approval",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": "auto_119",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:37.123288+00:00"
+        }
+      ],
+      "provider_calls": [
+        "get_indoor_env",
+        "get_device_status",
+        "capture_cctv",
+        "find_hospital",
+        "call_119",
+        "notify_guardian"
+      ]
+    },
+    {
+      "case_id": "DR-LLM-01-1",
+      "scenario_id": "DR-LLM-01",
+      "scenario": "fall",
+      "fault": "llm",
+      "fault_injected": true,
+      "outcome": "recovered",
+      "recovery": "template",
+      "expected_behavior_passed": true,
+      "technical_flow_ms": 101.504,
+      "run_id": "run-d61fccb6",
+      "care_response": {
+        "run_id": "run-d61fccb6",
+        "status": "pending_approval",
+        "current_step": "바이탈 확인 → IoT·CCTV 확인 → 위험 판정 완료(위급) → 보호자 승인 대기",
+        "care_status": {
+          "run_id": "run-d61fccb6",
+          "profile_id": "profile-02",
+          "scenario": "fall",
+          "attempt": 1,
+          "vital": {
+            "heart_rate": 118,
+            "systolic_bp": 120,
+            "temperature_c": 36.4,
+            "spo2": 96,
+            "measured_at": "2026-10-12T06:57:36.184419Z"
+          },
+          "indoor_environment": {
+            "temperature_c": 25.0,
+            "humidity_percent": 50.0
+          },
+          "devices": {
+            "air_conditioner": "off",
+            "induction": "off",
+            "induction_minutes": null,
+            "induction_temperature": null
+          },
+          "cctv": {
+            "image_path": "assets/cctv/fall.png",
+            "summary": null,
+            "person_visible": true,
+            "posture": "fallen",
+            "fall_suspected": true,
+            "confidence": 0.9,
+            "description": "시연 관찰 결과",
+            "status": "analyzed"
+          },
+          "vulnerability": "중",
+          "area": "서울시 송파구",
+          "source": "live",
+          "errors": []
+        },
+        "emergency": {
+          "run_id": "run-d61fccb6",
+          "risk_level": "위급",
+          "reasons": [
+            "CCTV 쓰러짐 의심",
+            "심박·혈압 변화"
+          ],
+          "axes": {
+            "fall": "위급",
+            "cardio": "주의",
+            "respiratory": "정상",
+            "environment": "정상"
+          },
+          "fall_state": "confirmed",
+          "auto_119": null,
+          "proposed_actions": [
+            {
+              "tool": "call_119",
+              "description": "119 호출",
+              "arguments": {
+                "message": "CCTV 쓰러짐 의심 + 심박·혈압 변화"
+              },
+              "needs_approval": true
+            },
+            {
+              "tool": "find_hospital",
+              "description": "가까운 병원 정보 안내",
+              "arguments": {
+                "area": "서울시 송파구"
+              },
+              "needs_approval": false
+            },
+            {
+              "tool": "notify_guardian",
+              "description": "보호자에게 상황 알림",
+              "arguments": {
+                "message": "CCTV 쓰러짐 의심 + 심박·혈압 변화"
+              },
+              "needs_approval": false
+            }
+          ],
+          "requires_approval": true,
+          "cctv_summary": "시연 관찰 결과"
+        },
+        "message": "CCTV 쓰러짐 의심 + 심박·혈압 변화",
+        "approved": null,
+        "decided_by": null,
+        "actions": [],
+        "guardian_message": null,
+        "elder_message": null
+      },
+      "final_response": {
+        "run_id": "run-d61fccb6",
+        "status": "done",
+        "current_step": "보호자 승인 → Action 실행 → Summary 안내 완료",
+        "actions": [
+          {
+            "tool": "call_119",
+            "status": "success",
+            "message": "Mock 실행 완료",
+            "recovery": null
+          },
+          {
+            "tool": "notify_guardian",
+            "status": "success",
+            "message": "Mock 실행 완료",
+            "recovery": null
+          }
+        ],
+        "guardian_message": "승인하신 대로 119에 연락했습니다. 가까운 응급실: 시연병원 (1.2km). 지금 바로 어르신께 전화해 상태를 확인하세요.",
+        "elder_message": "어르신, 구급대가 오고 있어요. 보호자분께도 알렸어요. 움직이지 말고 그대로 계세요.",
+        "approved": true,
+        "decided_by": "guardian"
+      },
+      "logs": [
+        {
+          "id": 1,
+          "run_id": "run-d61fccb6",
+          "step": "iot_env",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:37.201812+00:00"
+        },
+        {
+          "id": 2,
+          "run_id": "run-d61fccb6",
+          "step": "iot_devices",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:37.207481+00:00"
+        },
+        {
+          "id": 3,
+          "run_id": "run-d61fccb6",
+          "step": "vision",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:37.213339+00:00"
+        },
+        {
+          "id": 4,
+          "run_id": "run-d61fccb6",
+          "step": "vital",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 31,
+          "created_at": "2026-10-12T06:57:37.225027+00:00"
+        },
+        {
+          "id": 5,
+          "run_id": "run-d61fccb6",
+          "step": "llm",
+          "attempt": 1,
+          "status": "retry",
+          "error": "LLMOutputError",
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:37.231930+00:00"
+        },
+        {
+          "id": 6,
+          "run_id": "run-d61fccb6",
+          "step": "llm",
+          "attempt": 2,
+          "status": "retry",
+          "error": "LLMOutputError",
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:37.237435+00:00"
+        },
+        {
+          "id": 7,
+          "run_id": "run-d61fccb6",
+          "step": "llm",
+          "attempt": 2,
+          "status": "fallback",
+          "error": null,
+          "recovery": "template",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:37.243874+00:00"
+        },
+        {
+          "id": 8,
+          "run_id": "run-d61fccb6",
+          "step": "action:call_119",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:37.255820+00:00"
+        },
+        {
+          "id": 9,
+          "run_id": "run-d61fccb6",
+          "step": "summary",
+          "attempt": 1,
+          "status": "retry",
+          "error": "LLMOutputError",
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:37.264724+00:00"
+        },
+        {
+          "id": 10,
+          "run_id": "run-d61fccb6",
+          "step": "summary",
+          "attempt": 2,
+          "status": "retry",
+          "error": "LLMOutputError",
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:37.270209+00:00"
+        },
+        {
+          "id": 11,
+          "run_id": "run-d61fccb6",
+          "step": "summary",
+          "attempt": 2,
+          "status": "fallback",
+          "error": null,
+          "recovery": "template",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:37.276565+00:00"
+        },
+        {
+          "id": 12,
+          "run_id": "run-d61fccb6",
+          "step": "action:notify_guardian",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:37.283644+00:00"
+        },
+        {
+          "id": 13,
+          "run_id": "run-d61fccb6",
+          "step": "approval",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": "approved",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:37.289129+00:00"
+        }
+      ],
+      "provider_calls": [
+        "get_indoor_env",
+        "get_device_status",
+        "capture_cctv",
+        "analyze_cctv",
+        "find_hospital",
+        "call_119",
+        "notify_guardian"
+      ]
+    },
+    {
+      "case_id": "DR-VITAL-01-2",
+      "scenario_id": "DR-VITAL-01",
+      "scenario": "heat",
+      "fault": "vital",
+      "fault_injected": true,
+      "outcome": "recovered",
+      "recovery": "cache",
+      "expected_behavior_passed": true,
+      "technical_flow_ms": 1614.0,
+      "run_id": "run-b75aa8c5",
+      "care_response": {
+        "run_id": "run-b75aa8c5",
+        "status": "pending_approval",
+        "current_step": "바이탈 확인 → IoT·CCTV 확인 → 위험 판정 완료(경고) → 보호자 승인 대기",
+        "care_status": {
+          "run_id": "run-b75aa8c5",
+          "profile_id": "profile-02",
+          "scenario": "heat",
+          "attempt": 1,
+          "vital": {
+            "heart_rate": 105,
+            "systolic_bp": 140,
+            "temperature_c": 37.8,
+            "spo2": 96,
+            "measured_at": "2026-10-12T06:57:36.343603Z"
+          },
+          "indoor_environment": {
+            "temperature_c": 33.0,
+            "humidity_percent": 75.0
+          },
+          "devices": {
+            "air_conditioner": "off",
+            "induction": "off",
+            "induction_minutes": null,
+            "induction_temperature": null
+          },
+          "cctv": {
+            "image_path": "assets/cctv/normal.png",
+            "summary": null,
+            "person_visible": true,
+            "posture": "sitting",
+            "fall_suspected": false,
+            "confidence": 0.9,
+            "description": "시연 관찰 결과",
+            "status": "analyzed"
+          },
+          "vulnerability": "중",
+          "area": "서울시 송파구",
+          "source": "cache",
+          "errors": []
+        },
+        "emergency": {
+          "run_id": "run-b75aa8c5",
+          "risk_level": "경고",
+          "reasons": [
+            "심박·혈압 변화",
+            "실내 온도 극한",
+            "이전 측정값 사용"
+          ],
+          "axes": {
+            "fall": "정상",
+            "cardio": "주의",
+            "respiratory": "정상",
+            "environment": "경고"
+          },
+          "fall_state": "none",
+          "auto_119": null,
+          "proposed_actions": [
+            {
+              "tool": "control_device",
+              "description": "에어컨 냉방 26℃로 켜기",
+              "arguments": {
+                "device": "aircon",
+                "action": "cool"
+              },
+              "needs_approval": true
+            },
+            {
+              "tool": "notify_guardian",
+              "description": "보호자에게 상황 알림",
+              "arguments": {
+                "message": "실내 온도 극한 + 심박·혈압 변화 + 이전 측정값 사용"
+              },
+              "needs_approval": false
+            }
+          ],
+          "requires_approval": true,
+          "cctv_summary": "시연 관찰 결과"
+        },
+        "message": "실내 온도 극한 + 심박·혈압 변화 + 이전 측정값 사용",
+        "approved": null,
+        "decided_by": null,
+        "actions": [],
+        "guardian_message": null,
+        "elder_message": null
+      },
+      "final_response": {
+        "run_id": "run-b75aa8c5",
+        "status": "done",
+        "current_step": "보호자 승인 → Action 실행 → Summary 안내 완료",
+        "actions": [
+          {
+            "tool": "control_device",
+            "status": "success",
+            "message": "Mock 실행 완료",
+            "recovery": null
+          },
+          {
+            "tool": "notify_guardian",
+            "status": "success",
+            "message": "Mock 실행 완료",
+            "recovery": null
+          }
+        ],
+        "guardian_message": "승인하신 조치(에어컨 냉방 26℃로 켜기)를 실행했습니다. 위험도 경고. 잠시 뒤 어르신 상태를 한 번 더 확인해 주세요.",
+        "elder_message": "어르신, 시원하게 에어컨을 켜 두었어요. 물 한 잔 천천히 드세요.",
+        "approved": true,
+        "decided_by": "guardian"
+      },
+      "logs": [
+        {
+          "id": 6,
+          "run_id": "run-b75aa8c5",
+          "step": "vital",
+          "attempt": 1,
+          "status": "retry",
+          "error": "InjectedFault",
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:37.424882+00:00"
+        },
+        {
+          "id": 7,
+          "run_id": "run-b75aa8c5",
+          "step": "iot_env",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:37.431439+00:00"
+        },
+        {
+          "id": 8,
+          "run_id": "run-b75aa8c5",
+          "step": "iot_devices",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:37.437857+00:00"
+        },
+        {
+          "id": 9,
+          "run_id": "run-b75aa8c5",
+          "step": "vision",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:37.444868+00:00"
+        },
+        {
+          "id": 10,
+          "run_id": "run-b75aa8c5",
+          "step": "vital",
+          "attempt": 2,
+          "status": "retry",
+          "error": "InjectedFault",
+          "recovery": null,
+          "elapsed_ms": 532,
+          "created_at": "2026-10-12T06:57:37.943495+00:00"
+        },
+        {
+          "id": 11,
+          "run_id": "run-b75aa8c5",
+          "step": "vital",
+          "attempt": 3,
+          "status": "fail",
+          "error": "InjectedFault",
+          "recovery": null,
+          "elapsed_ms": 1547,
+          "created_at": "2026-10-12T06:57:38.969314+00:00"
+        },
+        {
+          "id": 12,
+          "run_id": "run-b75aa8c5",
+          "step": "vital",
+          "attempt": 3,
+          "status": "fallback",
+          "error": null,
+          "recovery": "cache",
+          "elapsed_ms": 1563,
+          "created_at": "2026-10-12T06:57:38.981554+00:00"
+        },
+        {
+          "id": 13,
+          "run_id": "run-b75aa8c5",
+          "step": "llm",
+          "attempt": 1,
+          "status": "fallback",
+          "error": null,
+          "recovery": "template",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:38.988340+00:00"
+        },
+        {
+          "id": 14,
+          "run_id": "run-b75aa8c5",
+          "step": "action:control_device",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:39.002775+00:00"
+        },
+        {
+          "id": 15,
+          "run_id": "run-b75aa8c5",
+          "step": "summary",
+          "attempt": 1,
+          "status": "fallback",
+          "error": null,
+          "recovery": "template",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:39.010978+00:00"
+        },
+        {
+          "id": 16,
+          "run_id": "run-b75aa8c5",
+          "step": "action:notify_guardian",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:39.018506+00:00"
+        },
+        {
+          "id": 17,
+          "run_id": "run-b75aa8c5",
+          "step": "approval",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": "approved",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:39.023558+00:00"
+        }
+      ],
+      "provider_calls": [
+        "get_indoor_env",
+        "get_device_status",
+        "capture_cctv",
+        "analyze_cctv",
+        "find_hospital",
+        "control_device",
+        "notify_guardian"
+      ]
+    },
+    {
+      "case_id": "DR-IOT-01-2",
+      "scenario_id": "DR-IOT-01",
+      "scenario": "heat",
+      "fault": "iot",
+      "fault_injected": true,
+      "outcome": "failed",
+      "recovery": null,
+      "expected_behavior_passed": true,
+      "technical_flow_ms": 1613.64,
+      "run_id": "run-c792de36",
+      "care_response": {
+        "run_id": "run-c792de36",
+        "status": "pending_approval",
+        "current_step": "바이탈 확인 → IoT·CCTV 확인 → 위험 판정 완료(경고) → 보호자 승인 대기",
+        "care_status": {
+          "run_id": "run-c792de36",
+          "profile_id": "profile-02",
+          "scenario": "heat",
+          "attempt": 1,
+          "vital": {
+            "heart_rate": 105,
+            "systolic_bp": 140,
+            "temperature_c": 37.8,
+            "spo2": 96,
+            "measured_at": "2026-10-12T06:57:38.082654Z"
+          },
+          "indoor_environment": {
+            "temperature_c": 33.0,
+            "humidity_percent": 75.0
+          },
+          "devices": {
+            "air_conditioner": "off",
+            "induction": "off",
+            "induction_minutes": null,
+            "induction_temperature": null
+          },
+          "cctv": {
+            "image_path": "assets/cctv/normal.png",
+            "summary": null,
+            "person_visible": true,
+            "posture": "sitting",
+            "fall_suspected": false,
+            "confidence": 0.9,
+            "description": "시연 관찰 결과",
+            "status": "analyzed"
+          },
+          "vulnerability": "중",
+          "area": "서울시 송파구",
+          "source": "live",
+          "errors": []
+        },
+        "emergency": {
+          "run_id": "run-c792de36",
+          "risk_level": "경고",
+          "reasons": [
+            "심박·혈압 변화",
+            "실내 온도 극한"
+          ],
+          "axes": {
+            "fall": "정상",
+            "cardio": "주의",
+            "respiratory": "정상",
+            "environment": "경고"
+          },
+          "fall_state": "none",
+          "auto_119": null,
+          "proposed_actions": [
+            {
+              "tool": "control_device",
+              "description": "에어컨 냉방 26℃로 켜기",
+              "arguments": {
+                "device": "aircon",
+                "action": "cool"
+              },
+              "needs_approval": true
+            },
+            {
+              "tool": "notify_guardian",
+              "description": "보호자에게 상황 알림",
+              "arguments": {
+                "message": "실내 온도 극한 + 심박·혈압 변화"
+              },
+              "needs_approval": false
+            }
+          ],
+          "requires_approval": true,
+          "cctv_summary": "시연 관찰 결과"
+        },
+        "message": "실내 온도 극한 + 심박·혈압 변화",
+        "approved": null,
+        "decided_by": null,
+        "actions": [],
+        "guardian_message": null,
+        "elder_message": null
+      },
+      "final_response": {
+        "run_id": "run-c792de36",
+        "status": "done",
+        "current_step": "보호자 승인 → Action 실행 → Summary 안내 완료",
+        "actions": [
+          {
+            "tool": "control_device",
+            "status": "failed",
+            "message": "control_device Mock 실행에 실패했습니다.",
+            "recovery": "3회 시도 후 실패"
+          },
+          {
+            "tool": "notify_guardian",
+            "status": "success",
+            "message": "Mock 실행 완료",
+            "recovery": null
+          }
+        ],
+        "guardian_message": "에어컨 냉방 26℃로 켜기에 실패했습니다. 직접 조치가 필요합니다. 위험도 경고. 지금 바로 어르신께 연락하세요.",
+        "elder_message": "어르신, 에어컨이 켜지지 않았어요. 창문을 열고 물을 자주 드세요.",
+        "approved": true,
+        "decided_by": "guardian"
+      },
+      "logs": [
+        {
+          "id": 1,
+          "run_id": "run-c792de36",
+          "step": "iot_env",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:39.102208+00:00"
+        },
+        {
+          "id": 2,
+          "run_id": "run-c792de36",
+          "step": "iot_devices",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:39.108836+00:00"
+        },
+        {
+          "id": 3,
+          "run_id": "run-c792de36",
+          "step": "vision",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:39.116334+00:00"
+        },
+        {
+          "id": 4,
+          "run_id": "run-c792de36",
+          "step": "vital",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 31,
+          "created_at": "2026-10-12T06:57:39.130269+00:00"
+        },
+        {
+          "id": 5,
+          "run_id": "run-c792de36",
+          "step": "llm",
+          "attempt": 1,
+          "status": "fallback",
+          "error": null,
+          "recovery": "template",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:39.139051+00:00"
+        },
+        {
+          "id": 6,
+          "run_id": "run-c792de36",
+          "step": "action:control_device",
+          "attempt": 1,
+          "status": "retry",
+          "error": "InjectedFault",
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:39.157686+00:00"
+        },
+        {
+          "id": 7,
+          "run_id": "run-c792de36",
+          "step": "action:control_device",
+          "attempt": 2,
+          "status": "retry",
+          "error": "InjectedFault",
+          "recovery": null,
+          "elapsed_ms": 515,
+          "created_at": "2026-10-12T06:57:39.666823+00:00"
+        },
+        {
+          "id": 8,
+          "run_id": "run-c792de36",
+          "step": "action:control_device",
+          "attempt": 3,
+          "status": "fail",
+          "error": "InjectedFault",
+          "recovery": null,
+          "elapsed_ms": 1531,
+          "created_at": "2026-10-12T06:57:40.681635+00:00"
+        },
+        {
+          "id": 9,
+          "run_id": "run-c792de36",
+          "step": "summary",
+          "attempt": 1,
+          "status": "fallback",
+          "error": null,
+          "recovery": "template",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:40.689087+00:00"
+        },
+        {
+          "id": 10,
+          "run_id": "run-c792de36",
+          "step": "action:notify_guardian",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:40.695217+00:00"
+        },
+        {
+          "id": 11,
+          "run_id": "run-c792de36",
+          "step": "approval",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": "approved",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:40.701813+00:00"
+        }
+      ],
+      "provider_calls": [
+        "get_indoor_env",
+        "get_device_status",
+        "capture_cctv",
+        "analyze_cctv",
+        "find_hospital",
+        "notify_guardian"
+      ]
+    },
+    {
+      "case_id": "DR-VISION-01-2",
+      "scenario_id": "DR-VISION-01",
+      "scenario": "critical",
+      "fault": "vision",
+      "fault_injected": true,
+      "outcome": "degraded",
+      "recovery": null,
+      "expected_behavior_passed": true,
+      "technical_flow_ms": 586.621,
+      "run_id": "run-e031afad",
+      "care_response": {
+        "run_id": "run-e031afad",
+        "status": "done",
+        "current_step": "바이탈 확인 → 위험 판정(바이탈 매우 위험) → 119 자동 연결(mock) → 보호자 긴급 알림",
+        "care_status": {
+          "run_id": "run-e031afad",
+          "profile_id": "profile-02",
+          "scenario": "critical",
+          "attempt": 1,
+          "vital": {
+            "heart_rate": 140,
+            "systolic_bp": 85,
+            "temperature_c": 36.0,
+            "spo2": 88,
+            "measured_at": "2026-10-12T06:57:39.761240Z"
+          },
+          "indoor_environment": {
+            "temperature_c": 25.0,
+            "humidity_percent": 50.0
+          },
+          "devices": {
+            "air_conditioner": "off",
+            "induction": "off",
+            "induction_minutes": null,
+            "induction_temperature": null
+          },
+          "cctv": {
+            "image_path": "assets/cctv/lying.png",
+            "summary": null,
+            "person_visible": null,
+            "posture": null,
+            "fall_suspected": null,
+            "confidence": null,
+            "description": "영상 판단 불가",
+            "status": "failed"
+          },
+          "vulnerability": "중",
+          "area": "서울시 송파구",
+          "source": "live",
+          "errors": [
+            "cctv_failed"
+          ]
+        },
+        "emergency": {
+          "run_id": "run-e031afad",
+          "risk_level": "위급",
+          "reasons": [
+            "위험 범위 항목 2개 이상",
+            "심박·혈압 위험 범위",
+            "산소포화도 위험 범위",
+            "체온 변화",
+            "영상 판단 불가"
+          ],
+          "axes": {
+            "fall": "정상",
+            "cardio": "경고",
+            "respiratory": "경고",
+            "environment": "주의"
+          },
+          "fall_state": "none",
+          "auto_119": "VITAL_SEVERE",
+          "proposed_actions": [
+            {
+              "tool": "call_119",
+              "description": "119 바로 연결",
+              "arguments": {
+                "message": "심박·혈압 위험 범위 + 산소포화도 위험 범위 + 체온 변화 + 영상 판단 불가"
+              },
+              "needs_approval": false
+            },
+            {
+              "tool": "find_hospital",
+              "description": "가까운 병원 정보 안내",
+              "arguments": {
+                "area": "서울시 송파구"
+              },
+              "needs_approval": false
+            },
+            {
+              "tool": "notify_guardian",
+              "description": "보호자에게 상황 알림",
+              "arguments": {
+                "message": "심박·혈압 위험 범위 + 산소포화도 위험 범위 + 체온 변화 + 영상 판단 불가"
+              },
+              "needs_approval": false
+            }
+          ],
+          "requires_approval": false,
+          "cctv_summary": "영상 판단 불가"
+        },
+        "message": "[긴급] 바이탈 여러 항목이 매우 위험해 119에 바로 연락했습니다. 판정 근거: 심박·혈압 위험 범위 + 산소포화도 위험 범위 + 체온 변화 + 영상 판단 불가. CCTV 판단이 안 돼 원본 캡처를 직접 확인하세요. 가까운 응급실: 시연병원 (1.2km). 지금 바로 어르신께 전화하세요.",
+        "approved": null,
+        "decided_by": "auto",
+        "actions": [
+          {
+            "tool": "call_119",
+            "status": "success",
+            "message": "Mock 실행 완료",
+            "recovery": null
+          },
+          {
+            "tool": "notify_guardian",
+            "status": "success",
+            "message": "Mock 실행 완료",
+            "recovery": null
+          }
+        ],
+        "guardian_message": "바이탈 여러 항목이 매우 위험해 119에 바로 연락했습니다. 가까운 응급실: 시연병원 (1.2km). 지금 바로 어르신께 전화해 상태를 확인하세요.",
+        "elder_message": "어르신, 구급대가 오고 있어요. 보호자분께도 알렸어요. 움직이지 말고 그대로 계세요."
+      },
+      "final_response": {
+        "run_id": "run-e031afad",
+        "status": "done",
+        "current_step": "바이탈 확인 → 위험 판정(바이탈 매우 위험) → 119 자동 연결(mock) → 보호자 긴급 알림",
+        "care_status": {
+          "run_id": "run-e031afad",
+          "profile_id": "profile-02",
+          "scenario": "critical",
+          "attempt": 1,
+          "vital": {
+            "heart_rate": 140,
+            "systolic_bp": 85,
+            "temperature_c": 36.0,
+            "spo2": 88,
+            "measured_at": "2026-10-12T06:57:39.761240Z"
+          },
+          "indoor_environment": {
+            "temperature_c": 25.0,
+            "humidity_percent": 50.0
+          },
+          "devices": {
+            "air_conditioner": "off",
+            "induction": "off",
+            "induction_minutes": null,
+            "induction_temperature": null
+          },
+          "cctv": {
+            "image_path": "assets/cctv/lying.png",
+            "summary": null,
+            "person_visible": null,
+            "posture": null,
+            "fall_suspected": null,
+            "confidence": null,
+            "description": "영상 판단 불가",
+            "status": "failed"
+          },
+          "vulnerability": "중",
+          "area": "서울시 송파구",
+          "source": "live",
+          "errors": [
+            "cctv_failed"
+          ]
+        },
+        "emergency": {
+          "run_id": "run-e031afad",
+          "risk_level": "위급",
+          "reasons": [
+            "위험 범위 항목 2개 이상",
+            "심박·혈압 위험 범위",
+            "산소포화도 위험 범위",
+            "체온 변화",
+            "영상 판단 불가"
+          ],
+          "axes": {
+            "fall": "정상",
+            "cardio": "경고",
+            "respiratory": "경고",
+            "environment": "주의"
+          },
+          "fall_state": "none",
+          "auto_119": "VITAL_SEVERE",
+          "proposed_actions": [
+            {
+              "tool": "call_119",
+              "description": "119 바로 연결",
+              "arguments": {
+                "message": "심박·혈압 위험 범위 + 산소포화도 위험 범위 + 체온 변화 + 영상 판단 불가"
+              },
+              "needs_approval": false
+            },
+            {
+              "tool": "find_hospital",
+              "description": "가까운 병원 정보 안내",
+              "arguments": {
+                "area": "서울시 송파구"
+              },
+              "needs_approval": false
+            },
+            {
+              "tool": "notify_guardian",
+              "description": "보호자에게 상황 알림",
+              "arguments": {
+                "message": "심박·혈압 위험 범위 + 산소포화도 위험 범위 + 체온 변화 + 영상 판단 불가"
+              },
+              "needs_approval": false
+            }
+          ],
+          "requires_approval": false,
+          "cctv_summary": "영상 판단 불가"
+        },
+        "message": "[긴급] 바이탈 여러 항목이 매우 위험해 119에 바로 연락했습니다. 판정 근거: 심박·혈압 위험 범위 + 산소포화도 위험 범위 + 체온 변화 + 영상 판단 불가. CCTV 판단이 안 돼 원본 캡처를 직접 확인하세요. 가까운 응급실: 시연병원 (1.2km). 지금 바로 어르신께 전화하세요.",
+        "approved": null,
+        "decided_by": "auto",
+        "actions": [
+          {
+            "tool": "call_119",
+            "status": "success",
+            "message": "Mock 실행 완료",
+            "recovery": null
+          },
+          {
+            "tool": "notify_guardian",
+            "status": "success",
+            "message": "Mock 실행 완료",
+            "recovery": null
+          }
+        ],
+        "guardian_message": "바이탈 여러 항목이 매우 위험해 119에 바로 연락했습니다. 가까운 응급실: 시연병원 (1.2km). 지금 바로 어르신께 전화해 상태를 확인하세요.",
+        "elder_message": "어르신, 구급대가 오고 있어요. 보호자분께도 알렸어요. 움직이지 말고 그대로 계세요."
+      },
+      "logs": [
+        {
+          "id": 1,
+          "run_id": "run-e031afad",
+          "step": "iot_env",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:40.781050+00:00"
+        },
+        {
+          "id": 2,
+          "run_id": "run-e031afad",
+          "step": "iot_devices",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:40.787503+00:00"
+        },
+        {
+          "id": 3,
+          "run_id": "run-e031afad",
+          "step": "vision",
+          "attempt": 1,
+          "status": "retry",
+          "error": "InjectedFault",
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:40.793805+00:00"
+        },
+        {
+          "id": 4,
+          "run_id": "run-e031afad",
+          "step": "vital",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 31,
+          "created_at": "2026-10-12T06:57:40.807187+00:00"
+        },
+        {
+          "id": 5,
+          "run_id": "run-e031afad",
+          "step": "vision",
+          "attempt": 2,
+          "status": "fail",
+          "error": "InjectedFault",
+          "recovery": null,
+          "elapsed_ms": 516,
+          "created_at": "2026-10-12T06:57:41.308474+00:00"
+        },
+        {
+          "id": 6,
+          "run_id": "run-e031afad",
+          "step": "llm",
+          "attempt": 1,
+          "status": "fallback",
+          "error": null,
+          "recovery": "template",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:41.319094+00:00"
+        },
+        {
+          "id": 7,
+          "run_id": "run-e031afad",
+          "step": "action:call_119",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:41.326774+00:00"
+        },
+        {
+          "id": 8,
+          "run_id": "run-e031afad",
+          "step": "action:notify_guardian",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:41.333221+00:00"
+        },
+        {
+          "id": 9,
+          "run_id": "run-e031afad",
+          "step": "summary",
+          "attempt": 1,
+          "status": "fallback",
+          "error": null,
+          "recovery": "template",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:41.341851+00:00"
+        },
+        {
+          "id": 10,
+          "run_id": "run-e031afad",
+          "step": "approval",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": "auto_119",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:41.348352+00:00"
+        }
+      ],
+      "provider_calls": [
+        "get_indoor_env",
+        "get_device_status",
+        "capture_cctv",
+        "find_hospital",
+        "call_119",
+        "notify_guardian"
+      ]
+    },
+    {
+      "case_id": "DR-LLM-01-2",
+      "scenario_id": "DR-LLM-01",
+      "scenario": "fall",
+      "fault": "llm",
+      "fault_injected": true,
+      "outcome": "recovered",
+      "recovery": "template",
+      "expected_behavior_passed": true,
+      "technical_flow_ms": 118.798,
+      "run_id": "run-e768290d",
+      "care_response": {
+        "run_id": "run-e768290d",
+        "status": "pending_approval",
+        "current_step": "바이탈 확인 → IoT·CCTV 확인 → 위험 판정 완료(위급) → 보호자 승인 대기",
+        "care_status": {
+          "run_id": "run-e768290d",
+          "profile_id": "profile-02",
+          "scenario": "fall",
+          "attempt": 1,
+          "vital": {
+            "heart_rate": 118,
+            "systolic_bp": 120,
+            "temperature_c": 36.4,
+            "spo2": 96,
+            "measured_at": "2026-10-12T06:57:40.415632Z"
+          },
+          "indoor_environment": {
+            "temperature_c": 25.0,
+            "humidity_percent": 50.0
+          },
+          "devices": {
+            "air_conditioner": "off",
+            "induction": "off",
+            "induction_minutes": null,
+            "induction_temperature": null
+          },
+          "cctv": {
+            "image_path": "assets/cctv/fall.png",
+            "summary": null,
+            "person_visible": true,
+            "posture": "fallen",
+            "fall_suspected": true,
+            "confidence": 0.9,
+            "description": "시연 관찰 결과",
+            "status": "analyzed"
+          },
+          "vulnerability": "중",
+          "area": "서울시 송파구",
+          "source": "live",
+          "errors": []
+        },
+        "emergency": {
+          "run_id": "run-e768290d",
+          "risk_level": "위급",
+          "reasons": [
+            "CCTV 쓰러짐 의심",
+            "심박·혈압 변화"
+          ],
+          "axes": {
+            "fall": "위급",
+            "cardio": "주의",
+            "respiratory": "정상",
+            "environment": "정상"
+          },
+          "fall_state": "confirmed",
+          "auto_119": null,
+          "proposed_actions": [
+            {
+              "tool": "call_119",
+              "description": "119 호출",
+              "arguments": {
+                "message": "CCTV 쓰러짐 의심 + 심박·혈압 변화"
+              },
+              "needs_approval": true
+            },
+            {
+              "tool": "find_hospital",
+              "description": "가까운 병원 정보 안내",
+              "arguments": {
+                "area": "서울시 송파구"
+              },
+              "needs_approval": false
+            },
+            {
+              "tool": "notify_guardian",
+              "description": "보호자에게 상황 알림",
+              "arguments": {
+                "message": "CCTV 쓰러짐 의심 + 심박·혈압 변화"
+              },
+              "needs_approval": false
+            }
+          ],
+          "requires_approval": true,
+          "cctv_summary": "시연 관찰 결과"
+        },
+        "message": "CCTV 쓰러짐 의심 + 심박·혈압 변화",
+        "approved": null,
+        "decided_by": null,
+        "actions": [],
+        "guardian_message": null,
+        "elder_message": null
+      },
+      "final_response": {
+        "run_id": "run-e768290d",
+        "status": "done",
+        "current_step": "보호자 승인 → Action 실행 → Summary 안내 완료",
+        "actions": [
+          {
+            "tool": "call_119",
+            "status": "success",
+            "message": "Mock 실행 완료",
+            "recovery": null
+          },
+          {
+            "tool": "notify_guardian",
+            "status": "success",
+            "message": "Mock 실행 완료",
+            "recovery": null
+          }
+        ],
+        "guardian_message": "승인하신 대로 119에 연락했습니다. 가까운 응급실: 시연병원 (1.2km). 지금 바로 어르신께 전화해 상태를 확인하세요.",
+        "elder_message": "어르신, 구급대가 오고 있어요. 보호자분께도 알렸어요. 움직이지 말고 그대로 계세요.",
+        "approved": true,
+        "decided_by": "guardian"
+      },
+      "logs": [
+        {
+          "id": 1,
+          "run_id": "run-e768290d",
+          "step": "iot_env",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:41.435662+00:00"
+        },
+        {
+          "id": 2,
+          "run_id": "run-e768290d",
+          "step": "iot_devices",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:41.443360+00:00"
+        },
+        {
+          "id": 3,
+          "run_id": "run-e768290d",
+          "step": "vision",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:41.450047+00:00"
+        },
+        {
+          "id": 4,
+          "run_id": "run-e768290d",
+          "step": "vital",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 31,
+          "created_at": "2026-10-12T06:57:41.465312+00:00"
+        },
+        {
+          "id": 5,
+          "run_id": "run-e768290d",
+          "step": "llm",
+          "attempt": 1,
+          "status": "retry",
+          "error": "LLMOutputError",
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:41.473311+00:00"
+        },
+        {
+          "id": 6,
+          "run_id": "run-e768290d",
+          "step": "llm",
+          "attempt": 2,
+          "status": "retry",
+          "error": "LLMOutputError",
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:41.480859+00:00"
+        },
+        {
+          "id": 7,
+          "run_id": "run-e768290d",
+          "step": "llm",
+          "attempt": 2,
+          "status": "fallback",
+          "error": null,
+          "recovery": "template",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:41.488410+00:00"
+        },
+        {
+          "id": 8,
+          "run_id": "run-e768290d",
+          "step": "action:call_119",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:41.501070+00:00"
+        },
+        {
+          "id": 9,
+          "run_id": "run-e768290d",
+          "step": "summary",
+          "attempt": 1,
+          "status": "retry",
+          "error": "LLMOutputError",
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:41.510182+00:00"
+        },
+        {
+          "id": 10,
+          "run_id": "run-e768290d",
+          "step": "summary",
+          "attempt": 2,
+          "status": "retry",
+          "error": "LLMOutputError",
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:41.517265+00:00"
+        },
+        {
+          "id": 11,
+          "run_id": "run-e768290d",
+          "step": "summary",
+          "attempt": 2,
+          "status": "fallback",
+          "error": null,
+          "recovery": "template",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:41.522341+00:00"
+        },
+        {
+          "id": 12,
+          "run_id": "run-e768290d",
+          "step": "action:notify_guardian",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:41.529100+00:00"
+        },
+        {
+          "id": 13,
+          "run_id": "run-e768290d",
+          "step": "approval",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": "approved",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:41.536239+00:00"
+        }
+      ],
+      "provider_calls": [
+        "get_indoor_env",
+        "get_device_status",
+        "capture_cctv",
+        "analyze_cctv",
+        "find_hospital",
+        "call_119",
+        "notify_guardian"
+      ]
+    },
+    {
+      "case_id": "DR-VITAL-01-3",
+      "scenario_id": "DR-VITAL-01",
+      "scenario": "heat",
+      "fault": "vital",
+      "fault_injected": true,
+      "outcome": "recovered",
+      "recovery": "cache",
+      "expected_behavior_passed": true,
+      "technical_flow_ms": 1604.19,
+      "run_id": "run-b7d55d3d",
+      "care_response": {
+        "run_id": "run-b7d55d3d",
+        "status": "pending_approval",
+        "current_step": "바이탈 확인 → IoT·CCTV 확인 → 위험 판정 완료(경고) → 보호자 승인 대기",
+        "care_status": {
+          "run_id": "run-b7d55d3d",
+          "profile_id": "profile-02",
+          "scenario": "heat",
+          "attempt": 1,
+          "vital": {
+            "heart_rate": 105,
+            "systolic_bp": 140,
+            "temperature_c": 37.8,
+            "spo2": 96,
+            "measured_at": "2026-10-12T06:57:40.599481Z"
+          },
+          "indoor_environment": {
+            "temperature_c": 33.0,
+            "humidity_percent": 75.0
+          },
+          "devices": {
+            "air_conditioner": "off",
+            "induction": "off",
+            "induction_minutes": null,
+            "induction_temperature": null
+          },
+          "cctv": {
+            "image_path": "assets/cctv/normal.png",
+            "summary": null,
+            "person_visible": true,
+            "posture": "sitting",
+            "fall_suspected": false,
+            "confidence": 0.9,
+            "description": "시연 관찰 결과",
+            "status": "analyzed"
+          },
+          "vulnerability": "중",
+          "area": "서울시 송파구",
+          "source": "cache",
+          "errors": []
+        },
+        "emergency": {
+          "run_id": "run-b7d55d3d",
+          "risk_level": "경고",
+          "reasons": [
+            "심박·혈압 변화",
+            "실내 온도 극한",
+            "이전 측정값 사용"
+          ],
+          "axes": {
+            "fall": "정상",
+            "cardio": "주의",
+            "respiratory": "정상",
+            "environment": "경고"
+          },
+          "fall_state": "none",
+          "auto_119": null,
+          "proposed_actions": [
+            {
+              "tool": "control_device",
+              "description": "에어컨 냉방 26℃로 켜기",
+              "arguments": {
+                "device": "aircon",
+                "action": "cool"
+              },
+              "needs_approval": true
+            },
+            {
+              "tool": "notify_guardian",
+              "description": "보호자에게 상황 알림",
+              "arguments": {
+                "message": "실내 온도 극한 + 심박·혈압 변화 + 이전 측정값 사용"
+              },
+              "needs_approval": false
+            }
+          ],
+          "requires_approval": true,
+          "cctv_summary": "시연 관찰 결과"
+        },
+        "message": "실내 온도 극한 + 심박·혈압 변화 + 이전 측정값 사용",
+        "approved": null,
+        "decided_by": null,
+        "actions": [],
+        "guardian_message": null,
+        "elder_message": null
+      },
+      "final_response": {
+        "run_id": "run-b7d55d3d",
+        "status": "done",
+        "current_step": "보호자 승인 → Action 실행 → Summary 안내 완료",
+        "actions": [
+          {
+            "tool": "control_device",
+            "status": "success",
+            "message": "Mock 실행 완료",
+            "recovery": null
+          },
+          {
+            "tool": "notify_guardian",
+            "status": "success",
+            "message": "Mock 실행 완료",
+            "recovery": null
+          }
+        ],
+        "guardian_message": "승인하신 조치(에어컨 냉방 26℃로 켜기)를 실행했습니다. 위험도 경고. 잠시 뒤 어르신 상태를 한 번 더 확인해 주세요.",
+        "elder_message": "어르신, 시원하게 에어컨을 켜 두었어요. 물 한 잔 천천히 드세요.",
+        "approved": true,
+        "decided_by": "guardian"
+      },
+      "logs": [
+        {
+          "id": 6,
+          "run_id": "run-b7d55d3d",
+          "step": "vital",
+          "attempt": 1,
+          "status": "retry",
+          "error": "InjectedFault",
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:41.684876+00:00"
+        },
+        {
+          "id": 7,
+          "run_id": "run-b7d55d3d",
+          "step": "iot_env",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:41.692986+00:00"
+        },
+        {
+          "id": 8,
+          "run_id": "run-b7d55d3d",
+          "step": "iot_devices",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:41.700520+00:00"
+        },
+        {
+          "id": 9,
+          "run_id": "run-b7d55d3d",
+          "step": "vision",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:41.707583+00:00"
+        },
+        {
+          "id": 10,
+          "run_id": "run-b7d55d3d",
+          "step": "vital",
+          "attempt": 2,
+          "status": "retry",
+          "error": "InjectedFault",
+          "recovery": null,
+          "elapsed_ms": 516,
+          "created_at": "2026-10-12T06:57:42.195268+00:00"
+        },
+        {
+          "id": 11,
+          "run_id": "run-b7d55d3d",
+          "step": "vital",
+          "attempt": 3,
+          "status": "fail",
+          "error": "InjectedFault",
+          "recovery": null,
+          "elapsed_ms": 1516,
+          "created_at": "2026-10-12T06:57:43.206382+00:00"
+        },
+        {
+          "id": 12,
+          "run_id": "run-b7d55d3d",
+          "step": "vital",
+          "attempt": 3,
+          "status": "fallback",
+          "error": null,
+          "recovery": "cache",
+          "elapsed_ms": 1531,
+          "created_at": "2026-10-12T06:57:43.217493+00:00"
+        },
+        {
+          "id": 13,
+          "run_id": "run-b7d55d3d",
+          "step": "llm",
+          "attempt": 1,
+          "status": "fallback",
+          "error": null,
+          "recovery": "template",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:43.226740+00:00"
+        },
+        {
+          "id": 14,
+          "run_id": "run-b7d55d3d",
+          "step": "action:control_device",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:43.241790+00:00"
+        },
+        {
+          "id": 15,
+          "run_id": "run-b7d55d3d",
+          "step": "summary",
+          "attempt": 1,
+          "status": "fallback",
+          "error": null,
+          "recovery": "template",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:43.252682+00:00"
+        },
+        {
+          "id": 16,
+          "run_id": "run-b7d55d3d",
+          "step": "action:notify_guardian",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:43.262557+00:00"
+        },
+        {
+          "id": 17,
+          "run_id": "run-b7d55d3d",
+          "step": "approval",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": "approved",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:43.272479+00:00"
+        }
+      ],
+      "provider_calls": [
+        "get_indoor_env",
+        "get_device_status",
+        "capture_cctv",
+        "analyze_cctv",
+        "find_hospital",
+        "control_device",
+        "notify_guardian"
+      ]
+    },
+    {
+      "case_id": "DR-IOT-01-3",
+      "scenario_id": "DR-IOT-01",
+      "scenario": "heat",
+      "fault": "iot",
+      "fault_injected": true,
+      "outcome": "failed",
+      "recovery": null,
+      "expected_behavior_passed": true,
+      "technical_flow_ms": 1798.095,
+      "run_id": "run-607dbaa3",
+      "care_response": {
+        "run_id": "run-607dbaa3",
+        "status": "pending_approval",
+        "current_step": "바이탈 확인 → IoT·CCTV 확인 → 위험 판정 완료(경고) → 보호자 승인 대기",
+        "care_status": {
+          "run_id": "run-607dbaa3",
+          "profile_id": "profile-02",
+          "scenario": "heat",
+          "attempt": 1,
+          "vital": {
+            "heart_rate": 105,
+            "systolic_bp": 140,
+            "temperature_c": 37.8,
+            "spo2": 96,
+            "measured_at": "2026-10-12T06:57:42.359519Z"
+          },
+          "indoor_environment": {
+            "temperature_c": 33.0,
+            "humidity_percent": 75.0
+          },
+          "devices": {
+            "air_conditioner": "off",
+            "induction": "off",
+            "induction_minutes": null,
+            "induction_temperature": null
+          },
+          "cctv": {
+            "image_path": "assets/cctv/normal.png",
+            "summary": null,
+            "person_visible": true,
+            "posture": "sitting",
+            "fall_suspected": false,
+            "confidence": 0.9,
+            "description": "시연 관찰 결과",
+            "status": "analyzed"
+          },
+          "vulnerability": "중",
+          "area": "서울시 송파구",
+          "source": "live",
+          "errors": []
+        },
+        "emergency": {
+          "run_id": "run-607dbaa3",
+          "risk_level": "경고",
+          "reasons": [
+            "심박·혈압 변화",
+            "실내 온도 극한"
+          ],
+          "axes": {
+            "fall": "정상",
+            "cardio": "주의",
+            "respiratory": "정상",
+            "environment": "경고"
+          },
+          "fall_state": "none",
+          "auto_119": null,
+          "proposed_actions": [
+            {
+              "tool": "control_device",
+              "description": "에어컨 냉방 26℃로 켜기",
+              "arguments": {
+                "device": "aircon",
+                "action": "cool"
+              },
+              "needs_approval": true
+            },
+            {
+              "tool": "notify_guardian",
+              "description": "보호자에게 상황 알림",
+              "arguments": {
+                "message": "실내 온도 극한 + 심박·혈압 변화"
+              },
+              "needs_approval": false
+            }
+          ],
+          "requires_approval": true,
+          "cctv_summary": "시연 관찰 결과"
+        },
+        "message": "실내 온도 극한 + 심박·혈압 변화",
+        "approved": null,
+        "decided_by": null,
+        "actions": [],
+        "guardian_message": null,
+        "elder_message": null
+      },
+      "final_response": {
+        "run_id": "run-607dbaa3",
+        "status": "done",
+        "current_step": "보호자 승인 → Action 실행 → Summary 안내 완료",
+        "actions": [
+          {
+            "tool": "control_device",
+            "status": "failed",
+            "message": "control_device Mock 실행에 실패했습니다.",
+            "recovery": "3회 시도 후 실패"
+          },
+          {
+            "tool": "notify_guardian",
+            "status": "success",
+            "message": "Mock 실행 완료",
+            "recovery": null
+          }
+        ],
+        "guardian_message": "에어컨 냉방 26℃로 켜기에 실패했습니다. 직접 조치가 필요합니다. 위험도 경고. 지금 바로 어르신께 연락하세요.",
+        "elder_message": "어르신, 에어컨이 켜지지 않았어요. 창문을 열고 물을 자주 드세요.",
+        "approved": true,
+        "decided_by": "guardian"
+      },
+      "logs": [
+        {
+          "id": 1,
+          "run_id": "run-607dbaa3",
+          "step": "iot_env",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:43.383489+00:00"
+        },
+        {
+          "id": 2,
+          "run_id": "run-607dbaa3",
+          "step": "iot_devices",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:43.391813+00:00"
+        },
+        {
+          "id": 3,
+          "run_id": "run-607dbaa3",
+          "step": "vision",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:43.399796+00:00"
+        },
+        {
+          "id": 4,
+          "run_id": "run-607dbaa3",
+          "step": "vital",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 31,
+          "created_at": "2026-10-12T06:57:43.415790+00:00"
+        },
+        {
+          "id": 5,
+          "run_id": "run-607dbaa3",
+          "step": "llm",
+          "attempt": 1,
+          "status": "fallback",
+          "error": null,
+          "recovery": "template",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:43.427194+00:00"
+        },
+        {
+          "id": 6,
+          "run_id": "run-607dbaa3",
+          "step": "action:control_device",
+          "attempt": 1,
+          "status": "retry",
+          "error": "InjectedFault",
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:43.443070+00:00"
+        },
+        {
+          "id": 7,
+          "run_id": "run-607dbaa3",
+          "step": "action:control_device",
+          "attempt": 2,
+          "status": "retry",
+          "error": "InjectedFault",
+          "recovery": null,
+          "elapsed_ms": 500,
+          "created_at": "2026-10-12T06:57:43.950150+00:00"
+        },
+        {
+          "id": 8,
+          "run_id": "run-607dbaa3",
+          "step": "action:control_device",
+          "attempt": 3,
+          "status": "fail",
+          "error": "InjectedFault",
+          "recovery": null,
+          "elapsed_ms": 1687,
+          "created_at": "2026-10-12T06:57:45.132617+00:00"
+        },
+        {
+          "id": 9,
+          "run_id": "run-607dbaa3",
+          "step": "summary",
+          "attempt": 1,
+          "status": "fallback",
+          "error": null,
+          "recovery": "template",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:45.140779+00:00"
+        },
+        {
+          "id": 10,
+          "run_id": "run-607dbaa3",
+          "step": "action:notify_guardian",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:45.153832+00:00"
+        },
+        {
+          "id": 11,
+          "run_id": "run-607dbaa3",
+          "step": "approval",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": "approved",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:45.162154+00:00"
+        }
+      ],
+      "provider_calls": [
+        "get_indoor_env",
+        "get_device_status",
+        "capture_cctv",
+        "analyze_cctv",
+        "find_hospital",
+        "notify_guardian"
+      ]
+    },
+    {
+      "case_id": "DR-VISION-01-3",
+      "scenario_id": "DR-VISION-01",
+      "scenario": "critical",
+      "fault": "vision",
+      "fault_injected": true,
+      "outcome": "degraded",
+      "recovery": null,
+      "expected_behavior_passed": true,
+      "technical_flow_ms": 583.633,
+      "run_id": "run-2b3b28a6",
+      "care_response": {
+        "run_id": "run-2b3b28a6",
+        "status": "done",
+        "current_step": "바이탈 확인 → 위험 판정(바이탈 매우 위험) → 119 자동 연결(mock) → 보호자 긴급 알림",
+        "care_status": {
+          "run_id": "run-2b3b28a6",
+          "profile_id": "profile-02",
+          "scenario": "critical",
+          "attempt": 1,
+          "vital": {
+            "heart_rate": 140,
+            "systolic_bp": 85,
+            "temperature_c": 36.0,
+            "spo2": 88,
+            "measured_at": "2026-10-12T06:57:44.235022Z"
+          },
+          "indoor_environment": {
+            "temperature_c": 25.0,
+            "humidity_percent": 50.0
+          },
+          "devices": {
+            "air_conditioner": "off",
+            "induction": "off",
+            "induction_minutes": null,
+            "induction_temperature": null
+          },
+          "cctv": {
+            "image_path": "assets/cctv/lying.png",
+            "summary": null,
+            "person_visible": null,
+            "posture": null,
+            "fall_suspected": null,
+            "confidence": null,
+            "description": "영상 판단 불가",
+            "status": "failed"
+          },
+          "vulnerability": "중",
+          "area": "서울시 송파구",
+          "source": "live",
+          "errors": [
+            "cctv_failed"
+          ]
+        },
+        "emergency": {
+          "run_id": "run-2b3b28a6",
+          "risk_level": "위급",
+          "reasons": [
+            "위험 범위 항목 2개 이상",
+            "심박·혈압 위험 범위",
+            "산소포화도 위험 범위",
+            "체온 변화",
+            "영상 판단 불가"
+          ],
+          "axes": {
+            "fall": "정상",
+            "cardio": "경고",
+            "respiratory": "경고",
+            "environment": "주의"
+          },
+          "fall_state": "none",
+          "auto_119": "VITAL_SEVERE",
+          "proposed_actions": [
+            {
+              "tool": "call_119",
+              "description": "119 바로 연결",
+              "arguments": {
+                "message": "심박·혈압 위험 범위 + 산소포화도 위험 범위 + 체온 변화 + 영상 판단 불가"
+              },
+              "needs_approval": false
+            },
+            {
+              "tool": "find_hospital",
+              "description": "가까운 병원 정보 안내",
+              "arguments": {
+                "area": "서울시 송파구"
+              },
+              "needs_approval": false
+            },
+            {
+              "tool": "notify_guardian",
+              "description": "보호자에게 상황 알림",
+              "arguments": {
+                "message": "심박·혈압 위험 범위 + 산소포화도 위험 범위 + 체온 변화 + 영상 판단 불가"
+              },
+              "needs_approval": false
+            }
+          ],
+          "requires_approval": false,
+          "cctv_summary": "영상 판단 불가"
+        },
+        "message": "[긴급] 바이탈 여러 항목이 매우 위험해 119에 바로 연락했습니다. 판정 근거: 심박·혈압 위험 범위 + 산소포화도 위험 범위 + 체온 변화 + 영상 판단 불가. CCTV 판단이 안 돼 원본 캡처를 직접 확인하세요. 가까운 응급실: 시연병원 (1.2km). 지금 바로 어르신께 전화하세요.",
+        "approved": null,
+        "decided_by": "auto",
+        "actions": [
+          {
+            "tool": "call_119",
+            "status": "success",
+            "message": "Mock 실행 완료",
+            "recovery": null
+          },
+          {
+            "tool": "notify_guardian",
+            "status": "success",
+            "message": "Mock 실행 완료",
+            "recovery": null
+          }
+        ],
+        "guardian_message": "바이탈 여러 항목이 매우 위험해 119에 바로 연락했습니다. 가까운 응급실: 시연병원 (1.2km). 지금 바로 어르신께 전화해 상태를 확인하세요.",
+        "elder_message": "어르신, 구급대가 오고 있어요. 보호자분께도 알렸어요. 움직이지 말고 그대로 계세요."
+      },
+      "final_response": {
+        "run_id": "run-2b3b28a6",
+        "status": "done",
+        "current_step": "바이탈 확인 → 위험 판정(바이탈 매우 위험) → 119 자동 연결(mock) → 보호자 긴급 알림",
+        "care_status": {
+          "run_id": "run-2b3b28a6",
+          "profile_id": "profile-02",
+          "scenario": "critical",
+          "attempt": 1,
+          "vital": {
+            "heart_rate": 140,
+            "systolic_bp": 85,
+            "temperature_c": 36.0,
+            "spo2": 88,
+            "measured_at": "2026-10-12T06:57:44.235022Z"
+          },
+          "indoor_environment": {
+            "temperature_c": 25.0,
+            "humidity_percent": 50.0
+          },
+          "devices": {
+            "air_conditioner": "off",
+            "induction": "off",
+            "induction_minutes": null,
+            "induction_temperature": null
+          },
+          "cctv": {
+            "image_path": "assets/cctv/lying.png",
+            "summary": null,
+            "person_visible": null,
+            "posture": null,
+            "fall_suspected": null,
+            "confidence": null,
+            "description": "영상 판단 불가",
+            "status": "failed"
+          },
+          "vulnerability": "중",
+          "area": "서울시 송파구",
+          "source": "live",
+          "errors": [
+            "cctv_failed"
+          ]
+        },
+        "emergency": {
+          "run_id": "run-2b3b28a6",
+          "risk_level": "위급",
+          "reasons": [
+            "위험 범위 항목 2개 이상",
+            "심박·혈압 위험 범위",
+            "산소포화도 위험 범위",
+            "체온 변화",
+            "영상 판단 불가"
+          ],
+          "axes": {
+            "fall": "정상",
+            "cardio": "경고",
+            "respiratory": "경고",
+            "environment": "주의"
+          },
+          "fall_state": "none",
+          "auto_119": "VITAL_SEVERE",
+          "proposed_actions": [
+            {
+              "tool": "call_119",
+              "description": "119 바로 연결",
+              "arguments": {
+                "message": "심박·혈압 위험 범위 + 산소포화도 위험 범위 + 체온 변화 + 영상 판단 불가"
+              },
+              "needs_approval": false
+            },
+            {
+              "tool": "find_hospital",
+              "description": "가까운 병원 정보 안내",
+              "arguments": {
+                "area": "서울시 송파구"
+              },
+              "needs_approval": false
+            },
+            {
+              "tool": "notify_guardian",
+              "description": "보호자에게 상황 알림",
+              "arguments": {
+                "message": "심박·혈압 위험 범위 + 산소포화도 위험 범위 + 체온 변화 + 영상 판단 불가"
+              },
+              "needs_approval": false
+            }
+          ],
+          "requires_approval": false,
+          "cctv_summary": "영상 판단 불가"
+        },
+        "message": "[긴급] 바이탈 여러 항목이 매우 위험해 119에 바로 연락했습니다. 판정 근거: 심박·혈압 위험 범위 + 산소포화도 위험 범위 + 체온 변화 + 영상 판단 불가. CCTV 판단이 안 돼 원본 캡처를 직접 확인하세요. 가까운 응급실: 시연병원 (1.2km). 지금 바로 어르신께 전화하세요.",
+        "approved": null,
+        "decided_by": "auto",
+        "actions": [
+          {
+            "tool": "call_119",
+            "status": "success",
+            "message": "Mock 실행 완료",
+            "recovery": null
+          },
+          {
+            "tool": "notify_guardian",
+            "status": "success",
+            "message": "Mock 실행 완료",
+            "recovery": null
+          }
+        ],
+        "guardian_message": "바이탈 여러 항목이 매우 위험해 119에 바로 연락했습니다. 가까운 응급실: 시연병원 (1.2km). 지금 바로 어르신께 전화해 상태를 확인하세요.",
+        "elder_message": "어르신, 구급대가 오고 있어요. 보호자분께도 알렸어요. 움직이지 말고 그대로 계세요."
+      },
+      "logs": [
+        {
+          "id": 1,
+          "run_id": "run-2b3b28a6",
+          "step": "iot_env",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:45.259166+00:00"
+        },
+        {
+          "id": 2,
+          "run_id": "run-2b3b28a6",
+          "step": "iot_devices",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:45.267029+00:00"
+        },
+        {
+          "id": 3,
+          "run_id": "run-2b3b28a6",
+          "step": "vision",
+          "attempt": 1,
+          "status": "retry",
+          "error": "InjectedFault",
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:45.275645+00:00"
+        },
+        {
+          "id": 4,
+          "run_id": "run-2b3b28a6",
+          "step": "vital",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 31,
+          "created_at": "2026-10-12T06:57:45.290461+00:00"
+        },
+        {
+          "id": 5,
+          "run_id": "run-2b3b28a6",
+          "step": "vision",
+          "attempt": 2,
+          "status": "fail",
+          "error": "InjectedFault",
+          "recovery": null,
+          "elapsed_ms": 500,
+          "created_at": "2026-10-12T06:57:45.786436+00:00"
+        },
+        {
+          "id": 6,
+          "run_id": "run-2b3b28a6",
+          "step": "llm",
+          "attempt": 1,
+          "status": "fallback",
+          "error": null,
+          "recovery": "template",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:45.796530+00:00"
+        },
+        {
+          "id": 7,
+          "run_id": "run-2b3b28a6",
+          "step": "action:call_119",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:45.804620+00:00"
+        },
+        {
+          "id": 8,
+          "run_id": "run-2b3b28a6",
+          "step": "action:notify_guardian",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:45.812122+00:00"
+        },
+        {
+          "id": 9,
+          "run_id": "run-2b3b28a6",
+          "step": "summary",
+          "attempt": 1,
+          "status": "fallback",
+          "error": null,
+          "recovery": "template",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:45.817440+00:00"
+        },
+        {
+          "id": 10,
+          "run_id": "run-2b3b28a6",
+          "step": "approval",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": "auto_119",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:45.825110+00:00"
+        }
+      ],
+      "provider_calls": [
+        "get_indoor_env",
+        "get_device_status",
+        "capture_cctv",
+        "find_hospital",
+        "call_119",
+        "notify_guardian"
+      ]
+    },
+    {
+      "case_id": "DR-LLM-01-3",
+      "scenario_id": "DR-LLM-01",
+      "scenario": "fall",
+      "fault": "llm",
+      "fault_injected": true,
+      "outcome": "recovered",
+      "recovery": "template",
+      "expected_behavior_passed": true,
+      "technical_flow_ms": 115.6,
+      "run_id": "run-cbad471e",
+      "care_response": {
+        "run_id": "run-cbad471e",
+        "status": "pending_approval",
+        "current_step": "바이탈 확인 → IoT·CCTV 확인 → 위험 판정 완료(위급) → 보호자 승인 대기",
+        "care_status": {
+          "run_id": "run-cbad471e",
+          "profile_id": "profile-02",
+          "scenario": "fall",
+          "attempt": 1,
+          "vital": {
+            "heart_rate": 118,
+            "systolic_bp": 120,
+            "temperature_c": 36.4,
+            "spo2": 96,
+            "measured_at": "2026-10-12T06:57:44.888212Z"
+          },
+          "indoor_environment": {
+            "temperature_c": 25.0,
+            "humidity_percent": 50.0
+          },
+          "devices": {
+            "air_conditioner": "off",
+            "induction": "off",
+            "induction_minutes": null,
+            "induction_temperature": null
+          },
+          "cctv": {
+            "image_path": "assets/cctv/fall.png",
+            "summary": null,
+            "person_visible": true,
+            "posture": "fallen",
+            "fall_suspected": true,
+            "confidence": 0.9,
+            "description": "시연 관찰 결과",
+            "status": "analyzed"
+          },
+          "vulnerability": "중",
+          "area": "서울시 송파구",
+          "source": "live",
+          "errors": []
+        },
+        "emergency": {
+          "run_id": "run-cbad471e",
+          "risk_level": "위급",
+          "reasons": [
+            "CCTV 쓰러짐 의심",
+            "심박·혈압 변화"
+          ],
+          "axes": {
+            "fall": "위급",
+            "cardio": "주의",
+            "respiratory": "정상",
+            "environment": "정상"
+          },
+          "fall_state": "confirmed",
+          "auto_119": null,
+          "proposed_actions": [
+            {
+              "tool": "call_119",
+              "description": "119 호출",
+              "arguments": {
+                "message": "CCTV 쓰러짐 의심 + 심박·혈압 변화"
+              },
+              "needs_approval": true
+            },
+            {
+              "tool": "find_hospital",
+              "description": "가까운 병원 정보 안내",
+              "arguments": {
+                "area": "서울시 송파구"
+              },
+              "needs_approval": false
+            },
+            {
+              "tool": "notify_guardian",
+              "description": "보호자에게 상황 알림",
+              "arguments": {
+                "message": "CCTV 쓰러짐 의심 + 심박·혈압 변화"
+              },
+              "needs_approval": false
+            }
+          ],
+          "requires_approval": true,
+          "cctv_summary": "시연 관찰 결과"
+        },
+        "message": "CCTV 쓰러짐 의심 + 심박·혈압 변화",
+        "approved": null,
+        "decided_by": null,
+        "actions": [],
+        "guardian_message": null,
+        "elder_message": null
+      },
+      "final_response": {
+        "run_id": "run-cbad471e",
+        "status": "done",
+        "current_step": "보호자 승인 → Action 실행 → Summary 안내 완료",
+        "actions": [
+          {
+            "tool": "call_119",
+            "status": "success",
+            "message": "Mock 실행 완료",
+            "recovery": null
+          },
+          {
+            "tool": "notify_guardian",
+            "status": "success",
+            "message": "Mock 실행 완료",
+            "recovery": null
+          }
+        ],
+        "guardian_message": "승인하신 대로 119에 연락했습니다. 가까운 응급실: 시연병원 (1.2km). 지금 바로 어르신께 전화해 상태를 확인하세요.",
+        "elder_message": "어르신, 구급대가 오고 있어요. 보호자분께도 알렸어요. 움직이지 말고 그대로 계세요.",
+        "approved": true,
+        "decided_by": "guardian"
+      },
+      "logs": [
+        {
+          "id": 1,
+          "run_id": "run-cbad471e",
+          "step": "iot_env",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:45.908384+00:00"
+        },
+        {
+          "id": 2,
+          "run_id": "run-cbad471e",
+          "step": "iot_devices",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:45.916460+00:00"
+        },
+        {
+          "id": 3,
+          "run_id": "run-cbad471e",
+          "step": "vision",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:45.924015+00:00"
+        },
+        {
+          "id": 4,
+          "run_id": "run-cbad471e",
+          "step": "vital",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 31,
+          "created_at": "2026-10-12T06:57:45.937545+00:00"
+        },
+        {
+          "id": 5,
+          "run_id": "run-cbad471e",
+          "step": "llm",
+          "attempt": 1,
+          "status": "retry",
+          "error": "LLMOutputError",
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:45.946313+00:00"
+        },
+        {
+          "id": 6,
+          "run_id": "run-cbad471e",
+          "step": "llm",
+          "attempt": 2,
+          "status": "retry",
+          "error": "LLMOutputError",
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:45.953315+00:00"
+        },
+        {
+          "id": 7,
+          "run_id": "run-cbad471e",
+          "step": "llm",
+          "attempt": 2,
+          "status": "fallback",
+          "error": null,
+          "recovery": "template",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:45.960044+00:00"
+        },
+        {
+          "id": 8,
+          "run_id": "run-cbad471e",
+          "step": "action:call_119",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:45.974076+00:00"
+        },
+        {
+          "id": 9,
+          "run_id": "run-cbad471e",
+          "step": "summary",
+          "attempt": 1,
+          "status": "retry",
+          "error": "LLMOutputError",
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:45.982309+00:00"
+        },
+        {
+          "id": 10,
+          "run_id": "run-cbad471e",
+          "step": "summary",
+          "attempt": 2,
+          "status": "retry",
+          "error": "LLMOutputError",
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:45.988292+00:00"
+        },
+        {
+          "id": 11,
+          "run_id": "run-cbad471e",
+          "step": "summary",
+          "attempt": 2,
+          "status": "fallback",
+          "error": null,
+          "recovery": "template",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:45.995330+00:00"
+        },
+        {
+          "id": 12,
+          "run_id": "run-cbad471e",
+          "step": "action:notify_guardian",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": null,
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:46.002394+00:00"
+        },
+        {
+          "id": 13,
+          "run_id": "run-cbad471e",
+          "step": "approval",
+          "attempt": 1,
+          "status": "success",
+          "error": null,
+          "recovery": "approved",
+          "elapsed_ms": 0,
+          "created_at": "2026-10-12T06:57:46.008743+00:00"
+        }
+      ],
+      "provider_calls": [
+        "get_indoor_env",
+        "get_device_status",
+        "capture_cctv",
+        "analyze_cctv",
+        "find_hospital",
+        "call_119",
+        "notify_guardian"
+      ]
+    }
+  ]
+}
