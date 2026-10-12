@@ -142,16 +142,16 @@ def test_get_device_status_returns_copy() -> None:
 def test_capture_cctv_supports_every_mock_profile(profile_id: str) -> None:
     result = capture_cctv(profile_id, "normal")
 
-    assert result == {"image_path": "assets/cctv/normal.jpg"}
+    assert result == {"image_path": "assets/cctv/normal.png"}
 
 
 @pytest.mark.parametrize(
     ("scenario", "expected_path"),
     [
-        ("normal", "assets/cctv/normal.jpg"),
-        ("heat", "assets/cctv/normal.jpg"),
-        ("induction", "assets/cctv/kitchen_empty.jpg"),
-        ("fall", "assets/cctv/fall.jpg"),
+        ("normal", "assets/cctv/normal.png"),
+        ("heat", "assets/cctv/normal.png"),
+        ("induction", "assets/cctv/kitchen_empty.png"),
+        ("fall", "assets/cctv/fall.png"),
     ],
 )
 def test_capture_cctv_returns_scenario_image(
@@ -178,7 +178,7 @@ def test_capture_cctv_returns_new_mapping() -> None:
     second = capture_cctv("profile-01", "fall")
     first["image_path"] = "changed.jpg"
 
-    assert second == {"image_path": "assets/cctv/fall.jpg"}
+    assert second == {"image_path": "assets/cctv/fall.png"}
 
 
 @pytest.mark.parametrize("area", HOSPITALS_BY_AREA)
