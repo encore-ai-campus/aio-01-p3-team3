@@ -25,4 +25,12 @@ h1,h2,h3 {letter-spacing:-.04em;color:var(--care-ink);}
 .care-account {display:flex;flex-wrap:wrap;align-items:center;gap:10px;color:#29495e;font-size:16px;font-weight:600;line-height:1.7;margin:4px 0 18px;}
 .care-account-badge {background:#e5f3fb;border:1px solid #b7d8eb;padding:4px 12px;border-radius:10px;color:#215270;font-size:15px;}
 .care-progress-label {color:#29495e;font-size:16px;font-weight:650;line-height:1.7;margin:10px 0 18px;}
+[data-testid="stTextInput"] label,
+[data-testid="stTextInput"] label p {color:#19354a!important;font-size:16px!important;font-weight:650!important;}
+[data-testid="stTextInput"] [data-baseweb="input"],
+[data-testid="stTextInput"] [data-baseweb="base-input"] {background:#fff!important;border-color:#8caec4!important;}
+[data-testid="stTextInput"] input {background:#fff!important;color:#19354a!important;caret-color:#19354a;}
+[data-testid="stTextInput"] input::placeholder {color:#526d80!important;opacity:1;}
+[data-testid="stTextInput"] button {color:#29495e!important;}
+[data-testid="stTextInput"] button svg {fill:currentColor;}
 @media(max-width:700px){.care-hero{padding:25px;}.care-hero h2{font-size:25px;}.care-orbit{display:none;}.block-container{padding-left:1rem;padding-right:1rem;}.care-brand span{display:block;margin-left:0;}}
