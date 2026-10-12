@@ -40,7 +40,7 @@ MOCK_PROFILES: Final[dict[str, dict[str, object]]] = {
         "home_id": "home-03",
         "area": "서울시 서초구",
     },
-    # 기화 10/12: 시연 영상에서 CCTV 사진 속 인물마다 부모 한 분 (자는 모습 = critical 시나리오)
+    # 기화 10/12: 시연 영상에서 CCTV 사진 속 인물마다 어르신 한 분 (자는 모습 = critical 시나리오)
     "profile-04": {
         "display_name": "어르신 D",
         "age": 86,
