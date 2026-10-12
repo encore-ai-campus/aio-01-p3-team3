@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import random
 import time
 from copy import deepcopy
 from dataclasses import dataclass
@@ -24,6 +25,27 @@ LOGGER = logging.getLogger("vital_sender")
 PROJECT_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_INGEST_URL = "http://localhost:8000/vitals/readings"
 
+# 보호자 로그인 시연에서 어르신마다 보여 줄 시나리오 (docs/scenarios.md 3장, frontend PROFILE_SCENARIO와 같다).
+# 백엔드는 (프로필, 시나리오)로 최신 측정값을 찾으므로 전송도 같은 짝으로 해야 한다.
+PROFILE_SCENARIOS: dict[str, Scenario] = {
+    "profile-01": "fall",
+    "profile-02": "heat",
+    "profile-03": "induction",
+    "profile-04": "critical",
+}
+
+# 실시간처럼 보이게 값을 흔들 때의 최대 변동폭.
+JITTER_STEP = {"heart_rate": 3, "systolic_bp": 3, "temperature_c": 0.1, "spo2": 1}
+# 변동해도 위험도 판정(backend/src/rules/risk.py 점수표)이 시나리오 기대 결과에서 벗어나지 않는 범위.
+# 값이 점수 경계에 걸리는 곳(critical 체온 36.0, 산소포화도 96 등)은 한쪽으로만 흔든다.
+JITTER_BOUNDS: dict[str, dict[str, tuple[float, float]]] = {
+    "normal": {"heart_rate": (62, 82), "systolic_bp": (118, 132), "temperature_c": (36.3, 36.8), "spo2": (97, 99)},
+    "heat": {"heart_rate": (100, 108), "systolic_bp": (133, 147), "temperature_c": (37.6, 37.9), "spo2": (96, 97)},
+    "induction": {"heart_rate": (74, 86), "systolic_bp": (123, 137), "temperature_c": (36.4, 36.8), "spo2": (96, 98)},
+    "fall": {"heart_rate": (114, 122), "systolic_bp": (114, 126), "temperature_c": (36.3, 36.6), "spo2": (96, 97)},
+    "critical": {"heart_rate": (135, 145), "systolic_bp": (80, 88), "temperature_c": (35.8, 36.0), "spo2": (86, 89)},
+}
+
 
 def _positive_float(value: str, name: str) -> float:
     try:
@@ -36,6 +58,21 @@ def _positive_float(value: str, name: str) -> float:
     return parsed
 
 
+def _flag(value: str | None) -> bool:
+    return (value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def jitter_vital(vital: dict[str, object], scenario: str, rng: random.Random) -> None:
+    """측정값을 시나리오 범위(JITTER_BOUNDS) 안에서 조금 흔든다. vital을 직접 바꾼다."""
+    for field, step in JITTER_STEP.items():
+        base = vital.get(field)
+        if base is None:
+            continue
+        low, high = JITTER_BOUNDS[scenario][field]
+        value = min(max(float(base) + rng.uniform(-step, step), low), high)
+        vital[field] = round(value, 1) if field == "temperature_c" else round(value)
+
+
 @dataclass(frozen=True)
 class SenderSettings:
     """바이탈 전송 프로그램 설정."""
@@ -44,6 +81,8 @@ class SenderSettings:
     interval_seconds: float = 15.0
     timeout_seconds: float = 5.0
     scenario: Scenario = "normal"
+    per_profile: bool = False  # True면 scenario 대신 어르신마다 PROFILE_SCENARIOS의 시나리오로 보낸다
+    jitter: bool = False       # True면 측정값을 시나리오 범위 안에서 조금씩 흔든다
 
     def __post_init__(self) -> None:
         parsed_url = urlparse(self.ingest_url)
@@ -74,6 +113,8 @@ class SenderSettings:
                 "VITAL_HTTP_TIMEOUT_SECONDS",
             ),
             scenario=scenario,  # type: ignore[arg-type]
+            per_profile=_flag(values.get("VITAL_PER_PROFILE")),
+            jitter=_flag(values.get("VITAL_JITTER")),
         )
 
 
@@ -82,8 +123,9 @@ def build_vital_payload(
     scenario: Scenario,
     *,
     measured_at: datetime | None = None,
+    rng: random.Random | None = None,
 ) -> dict[str, object]:
-    """기존 Mock 바이탈을 수집 API 요청 형식으로 변환한다."""
+    """기존 Mock 바이탈을 수집 API 요청 형식으로 변환한다. rng를 주면 값을 범위 안에서 흔든다."""
 
     if profile_id not in MOCK_PROFILES:
         raise ValueError(f"지원하지 않는 profile_id입니다: {profile_id}")
@@ -97,6 +139,9 @@ def build_vital_payload(
     timestamp = measured_at or datetime.now().astimezone()
     if timestamp.tzinfo is None:
         timestamp = timestamp.astimezone()
+
+    if rng is not None:
+        jitter_vital(vital, scenario, rng)
 
     vital["scenario"] = scenario
     vital["profile_id"] = profile_id
@@ -130,11 +175,14 @@ def send_vital_cycle(
     results: dict[str, str] = {}
     cycle_time = measured_at or datetime.now().astimezone()
 
+    rng = random.Random() if settings.jitter else None
     for profile_id in MOCK_PROFILES:
+        scenario = PROFILE_SCENARIOS.get(profile_id, settings.scenario) if settings.per_profile else settings.scenario
         payload = build_vital_payload(
             profile_id,
-            settings.scenario,
+            scenario,
             measured_at=cycle_time,
+            rng=rng,
         )
         try:
             response = post_vital_reading(client, settings.ingest_url, payload)
@@ -147,7 +195,7 @@ def send_vital_cycle(
         LOGGER.info(
             "바이탈 전송 완료 profile_id=%s scenario=%s measured_at=%s response=%s",
             profile_id,
-            settings.scenario,
+            payload["scenario"],
             payload["measured_at"],
             response,
         )
@@ -207,6 +255,18 @@ def _parse_args(settings: SenderSettings) -> argparse.Namespace:
         help="전송할 Mock 바이탈 시나리오",
     )
     parser.add_argument(
+        "--per-profile",
+        action="store_true",
+        default=settings.per_profile,
+        help="어르신마다 자기 시나리오(A 낙상·B 폭염·C 인덕션·D 위급)로 전송 (--scenario 무시)",
+    )
+    parser.add_argument(
+        "--jitter",
+        action="store_true",
+        default=settings.jitter,
+        help="측정값을 시나리오 범위 안에서 조금씩 흔들어 실시간처럼 보내기",
+    )
+    parser.add_argument(
         "--once",
         action="store_true",
         help="세 프로필을 한 번만 전송하고 종료",
@@ -229,6 +289,8 @@ def main() -> int:
             interval_seconds=args.interval,
             timeout_seconds=args.timeout,
             scenario=args.scenario,
+            per_profile=args.per_profile,
+            jitter=args.jitter,
         )
         run_sender(settings, once=args.once)
     except KeyboardInterrupt:

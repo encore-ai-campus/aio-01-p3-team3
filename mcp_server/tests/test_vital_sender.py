@@ -1,6 +1,7 @@
 """15초 주기 바이탈 HTTP 전송 프로그램 테스트 — 두나."""
 
 import json
+import random
 from datetime import datetime, timezone
 
 import httpx
@@ -8,6 +9,8 @@ import pytest
 
 from src.mock_data import MOCK_PROFILES, SCENARIOS
 from src.vital_sender import (
+    JITTER_BOUNDS,
+    PROFILE_SCENARIOS,
     SenderSettings,
     build_vital_payload,
     post_vital_reading,
@@ -168,3 +171,47 @@ def test_run_sender_once_does_not_wait() -> None:
         run_sender(settings, once=True, client=client)
 
     assert request_count == len(MOCK_PROFILES)
+
+
+def test_jitter_changes_values_but_stays_inside_scenario_bounds() -> None:
+    rng = random.Random(7)
+    seen_heart_rates = set()
+
+    for scenario in SCENARIOS:
+        base = SCENARIOS[scenario]["vital"]  # type: ignore[index]
+        for _ in range(300):
+            payload = build_vital_payload("profile-01", scenario, measured_at=FIXED_TIME, rng=rng)
+            for field, (low, high) in JITTER_BOUNDS[scenario].items():
+                assert low <= payload[field] <= high, (scenario, field, payload[field])  # type: ignore[operator]
+            if scenario == "normal":
+                seen_heart_rates.add(payload["heart_rate"])
+        for field, (low, high) in JITTER_BOUNDS[scenario].items():
+            assert low <= base[field] <= high, (scenario, field)  # type: ignore[index]
+
+    assert len(seen_heart_rates) > 1  # 실제로 값이 달라진다
+
+
+def test_per_profile_cycle_sends_each_elder_own_scenario() -> None:
+    received: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        received[payload["profile_id"]] = payload["scenario"]
+        return httpx.Response(201, json={"status": "stored"})
+
+    settings = SenderSettings(
+        ingest_url="http://backend.test/vitals/readings", per_profile=True, jitter=True
+    )
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        send_vital_cycle(client, settings, measured_at=FIXED_TIME)
+
+    assert received == PROFILE_SCENARIOS
+    assert set(PROFILE_SCENARIOS) == set(MOCK_PROFILES)
+
+
+def test_settings_read_per_profile_and_jitter_flags() -> None:
+    settings = SenderSettings.from_env({"VITAL_PER_PROFILE": "1", "VITAL_JITTER": "true"})
+
+    assert settings.per_profile is True
+    assert settings.jitter is True
+    assert SenderSettings.from_env({}).per_profile is False

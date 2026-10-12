@@ -9,3 +9,14 @@ services:
       - ../.env.docker
     ports:
       - "8010:8010"
+
+  # 어르신 4명의 바이탈을 15초마다 백엔드에 보내는 시뮬레이터 (실시간 심박수 시연용).
+  # 보낼 주소는 .env.docker의 VITAL_INGEST_URL (예: http://<서버 IP>:8000/vitals/readings).
+  vital-sender:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    env_file:
+      - ../.env.docker
+    command: ["python", "-m", "src.vital_sender", "--per-profile", "--jitter"]
+    restart: unless-stopped
