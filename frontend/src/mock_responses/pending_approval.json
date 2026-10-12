@@ -14,7 +14,7 @@
       "measured_at": "2026-10-08T15:30:00+09:00"
     },
     "cctv": {
-      "image_path": "assets/cctv/fall.jpg",
+      "image_path": "assets/cctv/fall.png",
       "summary": "거실 바닥에 사람이 쓰러져 있는 것으로 보입니다.",
       "status": "analyzed"
     },

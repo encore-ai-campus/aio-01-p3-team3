@@ -176,10 +176,15 @@ def validate_cctv(raw: str) -> tuple[dict | None, list[str]]:
         errors.append(f"body_support는 {SUPPORTS} 중 하나여야 함 (현재 {data['body_support']!r})")
     if data["body_shape"] not in SHAPES:
         errors.append(f"body_shape는 {SHAPES} 중 하나여야 함 (현재 {data['body_shape']!r})")
-    desc = data["description"].strip()
-    if not desc or len(desc) > DESCRIPTION_MAX:
-        errors.append(f"description은 1~{DESCRIPTION_MAX}자여야 함 (현재 {len(desc)}자)")
-    if len(re.findall(r"[.!?](?=\s|$)", desc)) > 1:
+    raw_description = data["description"]
+    desc = raw_description.strip()
+    # README 계약은 description이 문자열이면 빈 문자열도 허용한다.
+    # 공백 문자만 있는 값은 빈 문자열과 다르므로 아직 허용하지 않는다.
+    if raw_description != "" and not desc:
+        errors.append("description은 빈 문자열 또는 공백이 아닌 문장이어야 함")
+    elif desc and len(desc) > DESCRIPTION_MAX:
+        errors.append(f"description은 빈 문자열 또는 최대 {DESCRIPTION_MAX}자여야 함 (현재 {len(desc)}자)")
+    if desc and len(re.findall(r"[.!?](?=\s|$)", desc)) > 1:
         errors.append("description은 한 문장이어야 함")
     found = [w for w in CONFIRM_WORDS if w in desc]
     if found:

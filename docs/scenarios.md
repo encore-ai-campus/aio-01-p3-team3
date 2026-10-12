@@ -162,7 +162,7 @@ SCENARIOS = {
 |---|---|---|---|---|---|---|---|
 | `normal` | `profile-02` (중) | 정상 / 정상 / 정상 / 정상 | 이상 없음 | **정상** → 종료 | none | — | 없음 |
 | `heat` | `profile-02` (중) | 정상 / 주의 / 정상 / **경고** | 실내 온도 극한 + 심박·혈압 변화 | **경고** | none | — | 에어컨 냉방 ✅ / 보호자 알림(승인 요청) |
-| `induction` | `profile-03` (하) | 정상 / 정상 / 정상 / 주의 | 사람 없는 곳에서 인덕션 오래 켜짐 | **주의** | none | — | 인덕션 끄기 ✅ / 보호자 알림(승인 요청) |
+| `induction` | `profile-03` (하) | 정상 / 정상 / 정상 / 주의 | 사람 없는 곳에서 인덕션 오래 켜짐·과열 | **주의** | none | — | 인덕션 끄기 ✅ / 보호자 알림(승인 요청) |
 | `fall` | `profile-01` (상) | **위급** / 주의 / 정상 / 정상 | CCTV 쓰러짐 의심 + 심박·혈압 변화 | **위급** | confirmed | — | 119 호출 ✅ / 병원 정보 / 보호자 알림(승인 요청) |
 | `critical` | `profile-04` (상) | 정상 / 경고 / 경고 / 주의 + **위험 범위 3개** | 심박·혈압 위험 범위 + 산소포화도 위험 범위 + 체온 변화 | **위급** (위험 범위 2개 이상) | none | **VITAL_SEVERE** | **119 자동 연결** / 병원 정보 / 보호자 알림(긴급 알림) |
 
@@ -185,12 +185,17 @@ SCENARIOS = {
 
 | ID | 장애 | 조합 | 기대 동작 |
 |---|---|---|---|
-| DR-VITAL-01 | `vital` | `heat` + `profile-02` | 3회 재시도 실패 → 캐시 사용(`source: "cache"`) → "n분 전 측정값"으로 정상 진행 |
+| DR-VITAL-01 | `vital` | `heat` + `profile-02` | 3회 재시도 실패 → 캐시 사용(`source: "cache"`) → "n분 전 측정값"으로 정상 진행 (캐시가 없으면 mock 값으로 진행, 아래 참고) |
 | DR-IOT-01 | `iot` | `heat` + `profile-02` | 에어컨 냉방 승인 → 3회 재시도 실패 → **FAIL** (`ActionResult.status: "failed"`) → 보호자에게 "직접 조치 필요" |
-| DR-VISION-01 | `vision` | `critical` + `profile-01` | CCTV 2회 재시도 실패 → "영상 판단 불가"(`cctv.status: "failed"`) → 바이탈만으로 **위급** + 119 자동 연결 + 원본 캡처 확인 요청 |
+| DR-VISION-01 | `vision` | `critical` + `profile-04` | CCTV 2회 재시도 실패 → "영상 판단 불가"(`cctv.status: "failed"`) → 바이탈만으로 **위급** + 119 자동 연결 + 원본 캡처 확인 요청 |
 | DR-LLM-01 | `llm` | `fall` + `profile-01` | 1회 재요청 실패 → 고정 템플릿 문구로 안내 (위험도·조치는 코드라 정상 진행) |
 
-> `vital` 장애 전에는 같은 프로필로 `heat`를 장애 없이 한 번 실행해 캐시를 채워 둡니다. (7장 시연 순서대로 하면 2번에서 자동으로 채워집니다.)
+> **캐시는 시뮬레이터가 보낸 실시간 바이탈로만 채워집니다.** mock 값(시뮬레이터 없이 MCP가 돌려주는 값)은 캐시에 저장하지 않습니다 (상옥 님 `healing/vital.py`). 그래서 DR-VITAL-01에서 "캐시 사용"을 보여 주려면:
+> 1. 두나 님 바이탈 시뮬레이터(`mcp_server/src/vital_sender.py`)를 켜 둡니다.
+> 2. 같은 계정(자녀 B)으로 `heat`를 장애 없이 한 번 실행합니다 → 실시간 값이 캐시에 저장됨
+> 3. 이어서 `heat` + `vital` 장애를 실행합니다 → 재시도 3회 실패 후 "캐시(이전 측정값) 사용"
+>
+> 시뮬레이터 없이 실행하면 같은 장애가 "mock 값 사용"으로 복구됩니다. 복구는 되지만 "이전 측정값" 장면은 나오지 않습니다.
 
 ---
 
@@ -203,12 +208,12 @@ SCENARIOS = {
 | 3 | 자녀 C | `induction` | CCTV 주방 비어 있음 + 인덕션 120분·300℃ → 주의 → 인덕션 끄기 승인 |
 | 4 | 자녀 A | `fall` | **CCTV 캡처 → LLM 분석(쓰러짐 의심) → 위급 → 캡처와 함께 승인 요청 → 119 호출(mock)** |
 | 5 | 자녀 D | `critical` | 바이탈 위험 범위 3개(점수 합 10) → 위급 → **승인 없이 119 자동 연결** → 보호자 긴급 알림 |
-| 6 | 자녀 B | `heat` + `vital` 장애 | 바이탈 재시도 3회 → 캐시 사용 → "n분 전 측정값"으로 정상 진행 (2번에서 캐시가 채워짐) |
+| 6 | 자녀 B | `heat` + `vital` 장애 | 바이탈 재시도 3회 → 캐시 사용 → "n분 전 측정값"으로 정상 진행 (**시뮬레이터를 켠 상태**에서 2번을 먼저 실행해야 캐시가 채워짐, 6장 참고) |
 | 7 | 자녀 B | `heat` + `iot` 장애 | 에어컨 제어 재시도 3회 → FAIL → 보호자에게 "직접 조치 필요" |
 | 8 | 자녀 D | `critical` + `vision` 장애 | 영상 판단 불가 → 바이탈만으로 위급 → 119 자동 연결 + 원본 확인 요청 |
 | 9 | 자녀 A | `fall` + `llm` 장애 | 안내문 생성 실패 → 재요청 1회 → 템플릿 문구로 안내 |
 
-> 영상은 계정별로 묶어 찍고 편집에서 순서를 맞춰도 됩니다: 자녀 A(4·9) → 자녀 B(1·2·6·7) → 자녀 C(3) → 자녀 D(5·8). 6번은 같은 계정으로 2번을 먼저 실행해야 캐시가 채워집니다.
+> 영상은 계정별로 묶어 찍고 편집에서 순서를 맞춰도 됩니다: 자녀 A(4·9) → 자녀 B(1·2·6·7) → 자녀 C(3) → 자녀 D(5·8). 6번은 **바이탈 시뮬레이터를 켠 상태에서** 같은 계정으로 2번을 먼저 실행해야 캐시가 채워집니다 (시뮬레이터가 없으면 mock 값으로 복구됨).
 > 5번(자녀 D)은 CCTV에는 평범하게 자는 모습만 보이지만 바이탈이 매우 위험한 장면입니다. "카메라로는 모르는 위급을 바이탈이 잡아낸다"를 보여 줍니다.
 
 > 1~5번은 데이터 시나리오, 6~9번은 같은 시나리오에 장애를 얹은 AutoHealing 시연입니다. 화면 아래 AutoHealing 로그에서 재시도·폴백·FAIL 과정이 보이게 합니다.
@@ -252,15 +257,19 @@ SCENARIOS = {
 | 상옥 | `db/schema.sql`, `db/vital_readings.py` | `vital_readings` 테이블과 저장 필드에서 `diastolic_bp` 삭제 |
 | 상옥 | `tests/test_vital_readings.py`, `tests/test_healing.py` | 테스트 데이터에서 `diastolic_bp` 삭제 |
 
+### 반영 완료 (10/12)
+
+| 담당 | 파일 | 바꾼 내용 |
+|---|---|---|
+| 해든 | `schemas.py` | 119 자동 연결 시 `/care/run` 응답(`CareRunResponse`)에 실행 결과(`actions`)와 `guardian_message`·`elder_message`를 담는 필드 추가 |
+| 해든 | `rules/risk.py` | `normalize_care_status()`로 스키마 이름(`vital`, `heart_rate`, `indoor_environment` …)을 그대로 읽음 |
+| 해든 | `rules/risk.py` | 인덕션을 `induction_minutes`·`induction_temperature` 숫자로 읽고, 과열(≥250℃) 조건 추가 (`INDUCTION_HOT_TEMP = 250`) |
+| 지혜·해든 | `schemas.py`, `rules/risk.py` | `fall_event`·`signs`는 스키마에서 빠져 더 이상 들어오지 않음. `ELDER_NO_RESPONSE`·워치 확인은 꺼짐 (`risk.py` 안의 관련 코드는 남아 있으나 동작하지 않음) |
+| 해든·기화 | `rules/risk.py` | 119 승인 대기 60초 초과 시 자동 연결은 **쓰지 않기로 결정**. `ENABLE_TIMEOUT_119 = False` |
+| 두나·기화 | `mock_data.py` | 4-1의 데이터로 교체, CCTV `.png` 경로 (두나), `profile-04` 추가 (기화) |
+
 ### 남은 일
 
-| 담당 | 파일 | 바꿀 내용 |
-|---|---|---|
-| 지혜 | `schemas.py` | 119 자동 연결 시 `/care/run` 응답(`CareRunResponse`)에 실행 결과(`actions`)와 `guardian_message`를 담을 자리 필요 |
-| 해든 | `rules/risk.py` | 입력 키를 스키마 이름으로 (`vitals`→`vital`, `hr`→`heart_rate`, `env`→`indoor_environment` …) |
-| 해든 | `rules/risk.py` | 인덕션을 `induction_minutes`, `induction_temperature` 숫자로 읽고, 과열(≥250℃) 조건 추가 |
-| 해든 | `rules/risk.py` | `fall_event`·`signs` 입력과 `ELDER_NO_RESPONSE`, 스피커 확인(`speaker_check`) 제거 |
-| ~~해든·지혜~~ | ~~`rules/risk.py`~~ | ~~119 승인 대기 60초 초과 시 자동 연결 유지 여부~~ → **쓰지 않기로 결정 (10/12)**. `ENABLE_TIMEOUT_119 = False` |
-| 두나 | `mock_data.py` | 4-1의 데이터로 교체 |
+없음 (10/12 기준). 문서와 코드가 다르면 이 장에 추가해 주세요.
 
 > **결정 (10/12):** 승인 없이 119에 연결하는 경우는 **바이탈 매우 위험(`VITAL_SEVERE`)일 때 하나뿐**입니다. "119 승인 요청에 60초 동안 보호자 응답이 없으면 자동 연결"은 쓰지 않습니다 (`risk.py`의 `ENABLE_TIMEOUT_119 = False`). 시간이 지나도 119를 걸지 않고 보호자에게 다시 알림만 보냅니다.
