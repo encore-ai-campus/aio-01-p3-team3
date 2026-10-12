@@ -337,3 +337,40 @@ def test_streamlit_app_mounts_actual_care_workflow(monkeypatch: pytest.MonkeyPat
 
     assert not app.exception
     assert any(button.label == "상태 확인하기" for button in app.button)
+
+
+@pytest.mark.parametrize(
+    ("profile_id", "expected_scenario"),
+    [
+        ("profile-01", "fall"),
+        ("profile-02", "heat"),
+        ("profile-03", "induction"),
+        ("profile-04", "critical"),
+    ],
+)
+def test_logged_in_elder_is_fixed_to_own_scenario_with_all_faults(
+    monkeypatch: pytest.MonkeyPatch, profile_id: str, expected_scenario: str
+) -> None:
+    submitted: list[tuple[str, str, list[str]]] = []
+
+    def fake_run(backend_url, profile_id, scenario, fault):
+        submitted.append((profile_id, scenario, fault))
+        return {"run_id": "run-1", "status": "no_issue", "message": "이상 없음"}
+
+    monkeypatch.setattr(approval, "request_care_run", fake_run)
+    app = AppTest.from_string(
+        f"""
+from src.approval import render_care_workflow
+render_care_workflow("http://backend.test", profile_id="{profile_id}")
+"""
+    ).run()
+
+    assert [box.label for box in app.sidebar.selectbox] == []  # 시나리오 선택 없음
+    assert app.sidebar.multiselect[0].options == ["vital", "iot", "vision", "llm"] or len(
+        app.sidebar.multiselect[0].options
+    ) == 4
+    app.sidebar.multiselect[0].set_value(["vital", "iot", "vision", "llm"])
+    next(b for b in app.button if b.label == "상태 확인하기").click().run()
+
+    assert not app.exception
+    assert submitted == [(profile_id, expected_scenario, ["vital", "iot", "vision", "llm"])]

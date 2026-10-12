@@ -40,6 +40,13 @@ SCENARIO_LABELS = {
     "fall": "낙상",
     "critical": "바이탈 위급",
 }
+# 보호자 로그인 시연: 어르신마다 보여줄 시나리오를 하나로 고정한다 (docs/scenarios.md 3장).
+PROFILE_SCENARIO = {
+    "profile-01": "fall",
+    "profile-02": "heat",
+    "profile-03": "induction",
+    "profile-04": "critical",
+}
 FAULT_LABELS = {
     "vital": "바이탈 장애",
     "iot": "IoT 장애",
@@ -237,21 +244,28 @@ def render_care_workflow(backend_url: str, profile_id: str | None = None) -> Non
     """실제 ``/care/run``과 ``/care/approve``를 연결한 보호자 흐름을 그린다.
 
     profile_id를 넘기면(로그인한 보호자의 어르신, 기화 10/12) 어르신 선택을 숨기고 그 어르신으로 고정한다.
+    이때 시나리오도 그 어르신 몫(PROFILE_SCENARIO) 하나로 고정하고, 장애 주입 4종은 모두 고를 수 있다.
     """
 
     with st.sidebar:
-        st.header("시연 설정" if profile_id else "상태 확인 설정")
+        logged_in = profile_id is not None
+        st.header("시연 설정" if logged_in else "상태 확인 설정")
         if profile_id is None:
             profile_id = st.selectbox(
                 "어르신",
                 options=list(PROFILE_LABELS),
                 format_func=PROFILE_LABELS.__getitem__,
             )
-        scenario = st.selectbox(
-            "시연 시나리오",
-            options=list(SCENARIO_LABELS),
-            format_func=SCENARIO_LABELS.__getitem__,
-        )
+        fixed_scenario = PROFILE_SCENARIO.get(profile_id) if logged_in else None
+        if fixed_scenario:
+            scenario = fixed_scenario
+            st.markdown(f"**시연 시나리오**: {SCENARIO_LABELS[scenario]}")
+        else:
+            scenario = st.selectbox(
+                "시연 시나리오",
+                options=list(SCENARIO_LABELS),
+                format_func=SCENARIO_LABELS.__getitem__,
+            )
         fault = st.multiselect(
             "장애 주입",
             options=list(FAULT_LABELS),
