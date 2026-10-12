@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parents[1] / "config" / ".env")
 
 # .env를 먼저 읽어야 MCP_URL·LLM 키가 반영되므로 import를 아래에 둔다
-from fastapi import Depends, FastAPI, HTTPException, Response  # noqa: E402
+from fastapi import Depends, FastAPI, HTTPException, Query, Response  # noqa: E402
 
 from src import mcp_client  # noqa: E402
 from src.db.database import Database  # noqa: E402
@@ -30,6 +30,7 @@ from src.schemas import (  # noqa: E402
     CareApprovalResponse,
     CareRunRequest,
     CareRunResponse,
+    RunLogsResponse,
     VitalReadingCreate,
     VitalReadingResponse,
 )
@@ -66,6 +67,18 @@ async def ready() -> dict:
     except mcp_client.McpConnectionError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
     return {"status": "ok", "mcp": mcp_client.MCP_URL, "tools": tools}
+
+
+@app.get("/logs", response_model=RunLogsResponse)
+def get_logs(
+    run_id: str | None = Query(default=None, min_length=1),
+    limit: int = Query(default=100, ge=1, le=500),
+    db: Database = Depends(get_db),
+) -> RunLogsResponse:
+    """최근 AutoHealing 로그를 반환하고, run_id가 있으면 해당 실행만 조회한다."""
+    # 로그에는 오류 원문 대신 기존 DB가 저장하는 안전한 코드/예외 종류만 담긴다.
+    logs = db.recent_logs(run_id=run_id, limit=limit)
+    return RunLogsResponse(logs=logs, count=len(logs))
 
 
 CCTV_SUFFIXES = (".png", ".jpg", ".jpeg")
