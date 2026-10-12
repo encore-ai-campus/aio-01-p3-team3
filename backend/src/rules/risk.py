@@ -641,7 +641,7 @@ CCTV_FAILED_TEXT = "영상 판단 불가"
 # [팀 합의] 지혜 님: validation.py에서 CCTV 결과를 검사할 때 이 함수를 그대로 쓰면 됨 (빈 목록이면 PASS).
 # [팀 합의] 기화 님: agents/iot.py _cctv()의 with_healing validate를
 #   validate=lambda data: not cctv_contract_errors(data) 로 바꾸면 계약 위반도 재시도(2회) → 끝내 실패하면 status "failed".
-# [팀 합의] 전체: description이 빈 문자열이어도 지금은 통과 (README에 정해지지 않음). 금지하려면 아래 한 줄을 켜면 됨.
+# [팀 합의] README 기준: description 빈 문자열은 허용한다. 공백만 있는 문자열은 비전 분석기 정책으로 별도 처리한다.
 def cctv_contract_errors(cctv) -> list[str]:
     """CCTV 분석 결과가 출력 계약을 어긴 이유 목록. 빈 목록이면 계약을 지킴.
     status가 analyzed가 아니면(failed·unavailable) 분석 항목이 없어도 됨."""
