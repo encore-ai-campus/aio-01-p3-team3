@@ -67,8 +67,6 @@ class VitalReadingCreate(BaseModel):
 
     # 선택: 측정 장비나 전송 상황에 따라 값이 없을 수 있음
     systolic_bp: int | None = Field(default=None, ge=50, le=260, title="최고 혈압")
-    # 프로젝트 합의 범위 대상은 수축기 혈압이다. 최저혈압 범위는 별도 합의 전이라 유지한다.
-    diastolic_bp: int | None = Field(default=None, title="최저 혈압")
     temperature_c: float | None = Field(default=None, ge=30, le=43, description="체온(°C)")
     spo2: int | None = Field(
         default=None,
@@ -98,6 +96,27 @@ class VitalReadingResponse(BaseModel):
     )
     profile_id: str = Field(description="저장한 바이탈 데이터가 속한 어르신 ID")
     measured_at: datetime = Field(description="저장한 바이탈 데이터의 실제 측정 시각")
+
+
+class RunLogRecord(BaseModel):
+    """GET /logs가 돌려주는 SQLite 실행 로그 한 건."""
+
+    id: int
+    run_id: str
+    step: str
+    attempt: int
+    status: Literal["success", "retry", "fallback", "fail", "error"]
+    error: str | None = None
+    recovery: str | None = None
+    elapsed_ms: int
+    created_at: datetime
+
+
+class RunLogsResponse(BaseModel):
+    """최근 실행 로그와 반환 건수."""
+
+    logs: list[RunLogRecord]
+    count: int = Field(ge=0)
 
 
 class IndoorEnvironment(BaseModel):

@@ -668,7 +668,9 @@ CCTV 캡처처럼 보이는 이미지를 시나리오별로 미리 준비해 두
 | POST   | `/care/run`     | 모니터링 → 위험 판정 → 조치안 생성. 조치가 필요하면 `pending_approval` 반환 (`auto_119`면 바로 실행 후 `done`) |
 | POST   | `/care/approve` | 보호자 승인/거절 처리 → 조치 실행 → 결과 반환                               |
 | GET    | `/health`       | 서버 상태 확인                                                              |
-| GET    | `/logs`         | 최근 실행 기록 조회                                                         |
+| GET    | `/logs`         | 최근 실행 기록 조회 (`run_id` 선택, `limit` 기본 100·최대 500)             |
+
+`GET /logs`는 `{ "logs": [...], "count": 1 }` 형식으로 반환합니다. `count`는 실제 반환된 로그 수입니다. 로그 한 건은 `id`, `run_id`, `step`, `attempt`, `status`, `error`, `recovery`, `elapsed_ms`, `created_at`을 포함하며, 최신 기록부터 반환합니다. `run_id`를 지정하면 해당 실행 기록만 조회합니다.
 
 **`POST /care/run` 요청 예시**
 
