@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parents[1] / "config" / ".env")
 
 # .env를 먼저 읽어야 MCP_URL·LLM 키가 반영되므로 import를 아래에 둔다
-from fastapi import Depends, FastAPI, HTTPException  # noqa: E402
+from fastapi import Depends, FastAPI, HTTPException, Response  # noqa: E402
 
 from src import mcp_client  # noqa: E402
 from src.db.database import Database  # noqa: E402
@@ -66,6 +66,24 @@ async def ready() -> dict:
     except mcp_client.McpConnectionError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
     return {"status": "ok", "mcp": mcp_client.MCP_URL, "tools": tools}
+
+
+CCTV_SUFFIXES = (".png", ".jpg", ".jpeg")
+
+
+@app.get("/cctv/{name}")
+async def cctv_image(name: str) -> Response:
+    """CCTV 캡처 이미지를 MCP 서버에서 받아 전달한다 (README 2장: 이미지는 경로만 넘기고 화면은 URL로 받음).
+    name은 CareStatusResult.cctv.image_path의 파일 이름만 (예: fall.png)."""
+    if "/" in name or "\\" in name or ".." in name or not name.lower().endswith(CCTV_SUFFIXES):
+        raise HTTPException(status_code=404, detail="CCTV 이미지를 찾을 수 없습니다.")
+    try:
+        content, media_type = await mcp_client.fetch_cctv_image(name)
+    except mcp_client.CctvImageNotFound as error:
+        raise HTTPException(status_code=404, detail="CCTV 이미지를 찾을 수 없습니다.") from error
+    except mcp_client.McpConnectionError as error:
+        raise HTTPException(status_code=503, detail="CCTV 이미지를 가져올 수 없습니다 (MCP 연결 실패).") from error
+    return Response(content=content, media_type=media_type)
 
 
 @app.post("/vitals/readings", response_model=VitalReadingResponse)
