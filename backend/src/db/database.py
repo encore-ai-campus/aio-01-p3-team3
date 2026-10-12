@@ -25,7 +25,9 @@ class Database:
         self.clock = clock
         self.busy_timeout_s = busy_timeout_s
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        from src.db.migrations import migrate_vital_readings
         with self.connect() as db:
+            migrate_vital_readings(db)
             db.executescript(Path(__file__).with_name('schema.sql').read_text(encoding='utf-8'))
 
     @contextmanager
