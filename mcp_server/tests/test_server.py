@@ -41,7 +41,7 @@ def test_health_route() -> None:
 
 
 def test_cctv_route_rejects_unknown_name() -> None:
-    request = SimpleNamespace(path_params={"name": "unknown.jpg"})
+    request = SimpleNamespace(path_params={"name": "unknown.png"})
     response = asyncio.run(server.get_cctv_image(request))
 
     assert response.status_code == 404
