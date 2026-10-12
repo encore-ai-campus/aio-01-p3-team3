@@ -197,7 +197,7 @@ def vulnerability(p):
 | CCTV 분석     | `analyzed`이면 JSON 필수 키와 자료형 확인. `False`는 유효값이며 `description` 빈 문자열 허용. `failed`/`unavailable`은 관찰값 없이 허용 | RETRY |
 | LLM 출력      | JSON 파싱, 필수 키 존재 여부                                                          | RETRY 1회 → 템플릿 대체 |
 
-- 재시도 중 계약 검사는 Agent의 AutoHealing 콜백이 수행한다. Vital·IoT는 최초 요청 포함 총 3회, CCTV 분석은 최초 요청 포함 최대 3회(추가 재시도 2회) 시도한다.
+- 재시도 중 계약 검사는 Agent의 AutoHealing 콜백이 수행한다. Vital·IoT는 최초 요청 포함 총 3회, CCTV 분석은 백엔드에서 최초 요청 포함 2회 시도하고, 한 번의 분석 안에서 비전 LLM을 최대 3회(첫 호출 + 교정 재요청 2회) 부른다. 횟수와 대기 시간은 7장 [재시도 횟수와 대기 시간](#재시도-횟수와-대기-시간) 표 참고.
 - Orchestrator Validation은 복구 후 최종 결과를 `VALID`/`INVALID`로 확인해 오류를 보존한다. 이 단계에서 Agent를 다시 호출하지 않는다.
 - FAIL이면 해당 정보 없이 진행하거나 안전 종료하고, 보호자에게 알린 뒤 로그에 기록
 
@@ -367,6 +367,22 @@ def vulnerability(p):
 | DR-LLM-01    | 조치안·안내문 출력 형식 오류      | JSON 파싱 실패, 필수 키 누락 | "JSON으로만 답하라" 1회 재요청 → 고정 템플릿 문구        | —                                                                                    |
 
 DR-IOT-01은 **"끝까지 복구가 안 되면 사람에게 넘긴다"**를 보여주는 시나리오입니다.
+
+### 재시도 횟수와 대기 시간
+
+코드에 정해진 값입니다 (시연용 설정값). "대기 시간"은 한 번 호출을 기다리는 최대 시간이고, 넘으면 그 시도는 실패로 보고 다음 시도로 넘어갑니다.
+
+| 대상 | 시도 횟수 (최초 포함) | 한 번 대기 시간 | 끝내 실패하면 | 코드 위치 |
+| --- | --- | --- | --- | --- |
+| 바이탈 조회 | 3회 | 15초 | 캐시(이전 측정값) → mock → 안전 종료 | `backend/src/healing/retry.py` `RetryPolicy` 기본값 |
+| 실내 환경·기기 상태 조회 | 3회 | 15초 | "확인 불가"로 진행 | `backend/src/agents/iot.py` `READ_POLICY` |
+| CCTV 분석 (백엔드 → MCP `analyze_cctv`) | 2회 | 60초 | "영상 판단 불가", 원본 캡처 확인 요청 | `backend/src/agents/iot.py` `VISION_POLICY` |
+| └ 비전 LLM 호출 (분석 1번 안에서) | 3회 (첫 호출 + 교정 재요청 2회) | 15초 | 그 분석은 "판단 불가" | `mcp_server/src/vision/analyzer.py` |
+| 조치 실행 (기기 제어·119·알림) | 3회 | 10초 | 보호자에게 "직접 조치 필요" | `backend/src/orchestrator/approval_flow.py` `ACTION_POLICY` |
+| 문장 LLM (조치안·안내문) | 2회 (첫 호출 + 교정 재요청 1회) | 10초 | 고정 템플릿 문구 | `backend/src/llm/client.py` |
+
+- 재시도 사이 대기는 `0.5초 × 시도 번호`로 조금씩 늘어납니다 (0.5초, 1초, …).
+- CCTV는 비전 LLM 응답이 느려 한 번 대기 시간을 60초로 둡니다. 분석 1번 안의 LLM 3회(15초씩)가 이 안에 들어갑니다.
 
 ### 재시도 + 캐시 폴백
 
