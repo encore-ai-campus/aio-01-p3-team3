@@ -91,7 +91,9 @@ def test_timeout_only_reminds_when_switched_off(monkeypatch):
     assert t["execute"] == [] and [a["type"] for a in t["remind"]] == ["call_119"]
 
 
-def test_timeout_executes_119_and_reminds_devices():
+def test_timeout_executes_119_and_reminds_devices(monkeypatch):
+    # 60초 무응답 자동 연결은 시연에서 끔 (기화 10/12). 스위치를 켰을 때의 동작만 확인
+    monkeypatch.setattr(risk, "ENABLE_TIMEOUT_119", True)
     care = case(cam("fallen", True), vitals=NORMAL_VITALS)
     care["env"] = {"temp": 33}
     r = evaluate(care, month=8)
@@ -114,6 +116,7 @@ def test_info_only_notify_has_no_reminder():
 # ---------- 알림 문구 ----------
 
 def test_alert_messages(monkeypatch):
+    monkeypatch.setattr(risk, "ENABLE_TIMEOUT_119", True)     # 켰을 때 문구 (시연 기본값은 꺼짐)
     r = evaluate(full("fall"), month=8)
     assert "60초 안에 응답이 없으면 119에 자동으로 연락합니다" in pending_guardian_message("위급", r["reason"], r["actions"])
     assert "60초" not in pending_guardian_message("주의", "인덕션", evaluate(full("induction"), month=8)["actions"])

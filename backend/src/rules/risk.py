@@ -140,7 +140,9 @@ VITAL_SEVERE_SCORE = 7
 GUARDIAN_WAIT_119_SEC = 60
 # 해든 10/12: 팀 의견으로 유지. 119 승인 요청에 GUARDIAN_WAIT_119_SEC 동안 응답이 없으면 자동 연결(on_timeout "execute", decided_by "timeout").
 #   False로 바꾸면 시간이 지나도 119를 걸지 않고 다시 알림만 (on_timeout "remind").
-ENABLE_TIMEOUT_119 = True
+# 기화 10/12 (PM 결정): 승인 없는 119는 바이탈 매우 위험(VITAL_SEVERE)일 때만. 60초 무응답 자동 연결은 쓰지 않음 → False.
+#   (백엔드에 타이머가 없어 실제로 걸리지는 않았지만, 보호자 안내에 "60초 뒤 자동 연락" 문구가 나가던 것을 막음)
+ENABLE_TIMEOUT_119 = False
 GUARDIAN_REMIND_SEC = 30      # 승인 요청 뒤 응답이 없으면 한 번 더 알림
 AUTO_119_LABEL = {"ELDER_NO_RESPONSE": "어르신 응답 없음", "VITAL_SEVERE": "바이탈 여러 항목 매우 위험"}
 

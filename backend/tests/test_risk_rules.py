@@ -286,9 +286,9 @@ def test_heat_reason_has_body_temp_and_indoor():
 
 
 def test_demo_settings_follow_final_plan():
-    """README 9장: 워치 확인은 끔, CCTV 약한 의심은 경고, 119 승인 60초 무응답이면 자동 연결(팀 의견). 바이탈 매우 위험이면 119 자동 연결."""
+    """README 9장: 워치 확인은 끔, CCTV 약한 의심은 경고. 승인 없는 119는 바이탈 매우 위험일 때만 (60초 무응답 자동 연결은 끔, 기화 10/12)."""
     import src.rules.risk as risk
-    assert risk.ENABLE_WATCH_CHECK is False and risk.CCTV_SUSPECT_IS_CRITICAL is False and risk.ENABLE_TIMEOUT_119 is True
+    assert risk.ENABLE_WATCH_CHECK is False and risk.CCTV_SUSPECT_IS_CRITICAL is False and risk.ENABLE_TIMEOUT_119 is False
     assert risk.ENABLE_AUTO_119 is True and risk.ENABLE_AUTO_119_VITAL is True and risk.VITAL_DANGER_FROM_NEWS2 is True and risk.ENABLE_ENV_EXTREME is True
 
 
