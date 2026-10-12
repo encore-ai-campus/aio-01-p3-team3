@@ -7,6 +7,7 @@
 
 import os
 import sys
+from html import escape
 from pathlib import Path
 
 import streamlit as st
@@ -50,7 +51,11 @@ st.markdown('''<section class="care-hero"><div><div class="care-tag">FAMILY CARE
 header, logout_column = st.columns([3, 1])   # 좁은 창에서도 "로그아웃" 글자가 잘리지 않게
 with header:
     st.title(f"💚 {account.elder_name} 실시간 케어")
-    st.caption(f"{account.guardian_name} 님으로 로그인했습니다 · {account.elder_name} 취약도 {account.vulnerability}")
+    st.markdown(
+        f'<div class="care-account"><span>{escape(account.guardian_name)} 님으로 로그인했습니다</span>'
+        f'<span class="care-account-badge">{escape(account.elder_name)} · 취약도 {escape(account.vulnerability)}</span></div>',
+        unsafe_allow_html=True,
+    )
 with logout_column:
     if st.button("로그아웃", use_container_width=True):
         log_out()
