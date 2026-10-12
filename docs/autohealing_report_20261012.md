@@ -1,0 +1,56 @@
+# 상옥 AutoHealing 개발 및 장애 복구 보고서
+
+## 목표와 담당 범위
+
+바이탈 조회·IoT 조치·CCTV 분석·LLM 안내에 장애가 나도 제한된 재시도,
+검증된 대체 결과 또는 명시적인 실패 안내로 이어지는 기반을 구현한다.
+위험도는 팀의 코드 규칙이 정하며 상옥의 복구 계층이 바꾸지 않는다.
+실제 의료 데이터·기기·119를 연결하지 않는 가상 돌봄 시연 프로젝트다.
+
+## 저장 구조
+
+| 테이블 | 용도 | 주요 컬럼 |
+|---|---|---|
+| profiles | 가상 어르신 기본정보 | profile_id, age, lives_alone, has_condition, mobility_limited, area |
+| vital_readings | 측정 이력 | id, reading_id, profile_id, scenario, heart_rate, systolic_bp, diastolic_bp, temperature_c, spo2, measured_at/epoch, received_at/epoch |
+| cache | 마지막 정상 조회 결과 | key, value(JSON), saved_at(REAL) |
+| run_logs | 호출·복구 과정 | id, run_id, step, attempt, status, error, recovery, elapsed_ms, created_at |
+
+status는 success/retry/fallback/fail/error다. 승인·거절은 approval 단계의 success 로그와
+recovery=approved/rejected로 기록하며 별도 status 값으로 저장하지 않는다.
+정확한 DDL은 backend/src/db/schema.sql을 단일 기준으로 사용한다.
+지병명·실제 개인 상세 주소·CCTV 원본 이미지는 DB에 저장하지 않는다.
+
+## 구현 결과
+
+- 요청별 장애 주입과 제한 재시도, 프로그래밍 오류·취소 전파
+- 최신 바이탈 조회 → 검증 → 캐시 저장, 조회 장애 → 유효한 캐시
+- 같은 DB 자체 장애 시 캐시 건너뛰기, 저장 불가 로그의 메모리 events 전달
+- 부분 바이탈 저장, 누락값 NULL 보존, 내부 reading_id 중복 및 충돌 구분
+- 기존 DB 이력·ID·자동 증가 번호 보존 마이그레이션과 실패 롤백
+- 프로필 area 추가·빈 가상 프로필 지역 보충·추가 조회 없는 전달
+- 시뮬레이터 scenario 전달과 heat 캐시 준비 통합 검증
+- 시나리오 단위 지표 계산과 재현 가능한 장애 시험 실행기
+
+API는 심박수와 측정 시각을 수신해 SQLite에 저장한다. 최신값 조회 시 사용한
+정상 데이터가 cache에 남는다. HTTP 재전송마다 API가 UUID를 새로 만들므로
+HTTP 재전송 자체의 중복 방지까지 보장하지 않는다. MCP 대체 Mock은 캐시에 저장하지 않는다.
+
+## 실제 시험 결과와 증빙
+
+[12건 실행 보고서](evidence/autohealing_20261012/report.md)와
+[원본 응답·로그·소스 해시](evidence/autohealing_20261012/results.json)에 기록했다.
+바이탈·제어·영상·LLM 장애를 각 3회 반복했다. 기대 동작은 12건 모두 통과했다.
+해당 실행의 자동 복구율은 50%, 복구 성공 건의 평균 기술 흐름 시간은 885.370ms다.
+이는 선택된 로컬 시험 세트의 결과이며 서비스 전체 성능 수치가 아니다.
+영상 판단 불가 후 진행과 기기 실패 후 수동 안내는 해당 기능의 복구 성공으로 세지 않았다.
+실제 FastAPI 앱과 임시 SQLite를 실행했지만 MCP·LLM 공급자는 가짜 응답이다.
+네트워크·키가 있는 모델·화면·배포 완료의 증빙으로 사용하면 안 된다.
+지표 계산·실행기 회귀 시험을 포함한 백엔드 pytest는 464개 통과했고,
+compileall 및 git diff --check도 통과했다.
+
+## 남은 통합 확인
+
+/logs와 화면 연결, 센서 범위 검증 변경의 회귀 확인, CCTV confidence 및 중복 재시도,
+실제 LLM·비전 실행, DB 전체 장애의 최종 안내 전달은 담당자와 통합 확인해야 한다.
+승인 대기는 메모리 저장이므로 재시작 시 사라진다. 본 시험은 이를 개선한 작업이 아니다.
