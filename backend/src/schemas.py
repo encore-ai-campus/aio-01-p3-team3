@@ -246,6 +246,13 @@ class CareRunResponse(BaseModel):
     # 선택: 최종 결정이 아직 없거나 승인 대기 중이면 None
     decided_by: DecidedBy | None = None
 
+    # [팀 합의] 해든 10/12: 119 자동 연결(decided_by "auto")은 /care/run 한 번에 끝나므로
+    #   /care/approve 응답과 같은 결과 필드를 함께 돌려준다. 승인 대기·정상·실패에서는 비어 있음.
+    #   프런트 approval.py render_approval_result()가 이미 이 키들을 읽는다.
+    actions: list["ActionResult"] = Field(default_factory=list)
+    guardian_message: str | None = None
+    elder_message: str | None = None
+
 
 # ---------- POST /care/approve 요청 ----------
 
@@ -312,3 +319,7 @@ class CareApprovalResponse(BaseModel):
 
     # 선택: guardian=보호자 결정, auto=즉시 자동 119, timeout=60초 무응답
     decided_by: DecidedBy | None = None
+
+
+# CareRunResponse.actions가 아래에 정의된 ActionResult를 쓰므로 정의가 끝난 뒤 다시 만든다 (해든 10/12)
+CareRunResponse.model_rebuild()

@@ -14,6 +14,9 @@
 #   mcp_server/requirements/runtime.txt에 openai(또는 google-genai)와 pillow, config/.env.example에 OPENAI_API_KEY 추가가 필요.
 # 2026-10-08 해든 (두나 님 tools/cctv.py 연결): confidence를 "high"/"low" 대신 0~1 숫자(0.9/0.4)로, status(analyzed/unavailable) 추가,
 #   판단 불가일 때 person_visible을 None 대신 False로 (두나 님 analyze_cctv 검증이 bool·숫자를 요구). 판단 불가 여부는 status·available로 봄.
+# 2026-10-12 해든 (CCTV 출력 계약, 선택지 B): status "analyzed"로 내보내기 직전에 필수 4항목(person_visible, posture,
+#   fall_suspected, description)과 자료형을 한 번 더 확인함(check_output_contract). 어기면 CCTVOutputError → 재시도 →
+#   끝내 실패하면 unavailable(). 판단 불가 결과(unavailable)는 이 검사를 하지 않음. backend 쪽 같은 검사는 rules/risk.py cctv_contract_errors().
 
 import base64
 import io
@@ -24,7 +27,7 @@ import re
 from pathlib import Path
 from typing import Callable
 
-from src.vision.prompt import CCTV_SCHEMA, DESCRIPTION_MAX, SHAPES, SUPPORTS, cctv_prompt
+from src.vision.prompt import CCTV_SCHEMA, DESCRIPTION_MAX, POSTURES, SHAPES, SUPPORTS, cctv_prompt
 
 VisionLLM = Callable[[str, str], str]    # (프롬프트, 이미지 data URL) → 응답 문자열
 
@@ -190,13 +193,33 @@ def validate_cctv(raw: str) -> tuple[dict | None, list[str]]:
 
 # ---------- 분석 ----------
 
+# README 4장 CCTV 필수 키와 자료형. "analyzed" 결과는 이 4개가 반드시 있어야 Emergency Agent가 낙상을 판정할 수 있다.
+REQUIRED_WHEN_ANALYZED = {"person_visible": bool, "posture": str, "fall_suspected": bool, "description": str}
+
+
+def check_output_contract(result: dict) -> list[str]:
+    """분석 성공(status "analyzed") 결과가 출력 계약을 지키는지. 어긴 이유 목록, 빈 목록이면 통과 (해든 10/12, 선택지 B)."""
+    if result.get("status") != "analyzed":
+        return []                       # unavailable·failed는 분석 항목이 없어도 됨
+    errors = [f"{key} 없음 또는 자료형 오류({kind.__name__})"
+              for key, kind in REQUIRED_WHEN_ANALYZED.items() if not isinstance(result.get(key), kind)]
+    if result.get("posture") not in POSTURES:
+        errors.append(f"posture 값 오류({result.get('posture')!r})")
+    return errors
+
+
 # [팀 합의] 상옥 님: 재시도를 감쌀 함수. 성공하면 결과 dict, 실패하면 예외(SDK 예외 또는 CCTVOutputError).
 def analyze_cctv_image(image_path: str, llm: VisionLLM, errors: list[str] | None = None) -> dict:
     raw = llm(cctv_prompt(errors), encode_image(image_path))
     data, problems = validate_cctv(raw)
     if problems:
         raise CCTVOutputError(problems)
-    return {"image_path": str(image_path), "available": True, "status": "analyzed", **data}
+    result = {"image_path": str(image_path), "available": True, "status": "analyzed", **data}
+    # 해든 10/12: 내보내기 직전 계약 확인. validate_cctv가 이미 보장하지만, FACT_RULES·보정이 바뀌어도 계약이 깨지지 않게 막는다.
+    broken = check_output_contract(result)
+    if broken:
+        raise CCTVOutputError(broken)  # analyze_cctv_or_unavailable()이 재시도하고, 끝내 실패하면 unavailable()
+    return result
 
 
 def unavailable(image_path: str, reason: str = "") -> dict:

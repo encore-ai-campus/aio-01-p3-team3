@@ -10,6 +10,7 @@ from src import mcp_client
 from src.healing.faults import Faults
 from src.orchestrator import guards
 from src.orchestrator.approval import pending
+from src.orchestrator.auto_119 import run_auto_119
 from src.orchestrator.emergency import run_emergency_step
 from src.orchestrator.monitoring import run_monitoring
 from src.schemas import CareRunRequest, CareRunResponse
@@ -47,6 +48,11 @@ async def run_care(request: CareRunRequest, *, db, run_id: str | None = None) ->
     if not guards.handoff_guard(emergency.risk_level):
         return CareRunResponse(run_id=run_id, status="no_issue", care_status=care_status, emergency=emergency,
                                message="이상 없음", current_step=f"{STEP_MONITOR} → 위험 판정: 이상 없음 → 종료")
+
+    # [팀 합의] 해든 10/12: README 응답 3. 바이탈이 매우 위험하면(auto_119 "VITAL_SEVERE") 승인 대기 없이 바로 119 → 긴급 알림 → Summary.
+    if emergency.auto_119:
+        return await run_auto_119(db=db, run_id=run_id, care_status=care_status, emergency=emergency,
+                                  raw=raw, fault=list(request.fault))
 
     # TODO(⑤ 두나): emergency.requires_approval이 False(보호자 알림·병원 정보만)면 승인 없이 바로 실행하고
     #   Summary까지 진행. 다섯 시연 시나리오에는 이런 경우가 없다 (위험이 있으면 항상 기기 제어나 119가 포함됨).

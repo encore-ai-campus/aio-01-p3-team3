@@ -128,12 +128,19 @@ def test_fall_is_critical_from_cctv_and_119_needs_approval(client):
     assert body["emergency"]["cctv_summary"] == "fall.jpg 장면"
 
 
-def test_critical_119_is_approval_request_not_auto(client):
+def test_critical_calls_119_automatically(client, mcp):
+    """README 응답 3 (해든 10/12 변경): 바이탈 매우 위험 → 승인 대기 없이 119 → 긴급 알림 → 안내까지 한 번에."""
     body = care_run(client[0], "critical", "profile-01")
-    assert body["status"] == "pending_approval"
+    assert body["status"] == "done" and body["decided_by"] == "auto" and body["approved"] is None
     assert body["emergency"]["risk_level"] == "위급"
-    assert body["emergency"]["auto_119"] is None          # 해든 님 결정: 자동 119 꺼짐
-    assert tools_of(body)["call_119"]["needs_approval"] is True
+    assert body["emergency"]["auto_119"] == "VITAL_SEVERE"
+    assert body["emergency"]["requires_approval"] is False
+    assert tools_of(body)["call_119"]["needs_approval"] is False
+    assert [a["tool"] for a in body["actions"]] == ["call_119", "notify_guardian"]
+    assert body["message"].startswith("[긴급]")
+    assert body["guardian_message"] and body["elder_message"]
+    assert pending.get(body["run_id"]) is None             # 승인 대기에 남지 않음
+    assert mcp["calls"].index("call_119") < mcp["calls"].index("notify_guardian", mcp["calls"].index("call_119"))
 
 
 def test_pending_approval_is_saved_for_approve_step(client):
@@ -167,6 +174,7 @@ def test_llm_fault_uses_template_and_is_logged(client):
 def test_vision_fault_judges_by_vitals_only(client):
     body = care_run(client[0], "critical", "profile-01", fault=["vision"])
     assert body["emergency"]["risk_level"] == "위급"       # 바이탈 위험 범위 3개
+    assert body["decided_by"] == "auto" and "원본 캡처" in body["message"]   # 시연 8번: 자동 119 + 원본 확인 요청 (해든 10/12)
     assert body["care_status"]["cctv"]["status"] == "failed"
     assert body["care_status"]["cctv"]["image_path"] == "assets/cctv/lying.jpg"
 

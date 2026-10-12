@@ -4,6 +4,8 @@
 > 코드 안에서는 `grep -rn "팀 합의" backend/src mcp_server/src`로 같은 내용을 찾을 수 있습니다.
 > 모든 기준값은 **시연용 예시**이며 의학적 기준이 아닙니다.
 >
+> 10/12 변경: **README대로 critical은 119 자동 연결**. 바이탈 위험 범위 2개 이상 + 점수 합 7점 이상 + 최신 측정값이면 승인 없이 119 → 보호자 긴급 알림 → 안내까지 `/care/run` 한 번에 끝납니다 (`ENABLE_AUTO_119`·`ENABLE_AUTO_119_VITAL` = True, `backend/src/orchestrator/auto_119.py`). 아래 10/8의 "critical도 승인 요청"은 더 이상 맞지 않습니다. 에어컨 조치 값에 `action`(cool/heat)도 넣어 두나 님 `control_device(device, action)`가 바로 받습니다.
+>
 > 10/8 변경: **main 문서(`docs/scenarios.md` 개정판) 판정 기준에 맞춤**. 위험 범위 = NEWS2 3점, 작은 변화(1~2점)도 그 축 주의, 실내 이상 28℃ 초과/20℃ 미만, 실내 극한 31℃ 초과/18℃ 미만(경고). 문서 5장·8장 기대값과 같음. **단 하나 다른 점: critical도 119는 보호자 승인 요청**(해든 결정, 문서 2-4장 VITAL_SEVERE 자동 연결은 `ENABLE_AUTO_119 = False`로 끔).
 >
 > 10/8 변경: **main 스키마 연결**. `schemas.py`의 CareStatusResult(`vital.heart_rate`, `indoor_environment.temperature_c`, `devices.air_conditioner`, `induction` + `induction_minutes`, `cctv.status`)를 그대로 `evaluate()`/`run_emergency()`에 넘겨도 됩니다. `rules/risk.py`의 `normalize_care_status()`가 확정안 형식으로 바꿉니다. 확인: `backend/tests/test_schema_input.py`.
@@ -67,7 +69,7 @@ CCTV 이미지      ─▶ mcp_server vision/analyzer.py  자세·낙상 의심 
 | 119 (위급) | 📱 승인 요청 → 30초 다시 알림 → **60초 무응답이면 119 자동 연결** |
 | 정말 위급 | **승인 없이 119 바로 연결** → 📱 "[긴급] 119에 바로 연락했습니다" |
 
-"정말 위급" = 위급이면서 ① 워치 확인에 어르신 무응답(30초 안에 버튼 안 누름), 또는 ② 바이탈 위험 범위 2개 이상 + 점수 합 7점 이상(최신 측정값). ②는 확정안 critical이 "119 승인" 장면이라 기본으로 꺼 둠 (`ENABLE_AUTO_119_VITAL = False`).
+"정말 위급" = 위급이면서 ① 워치 확인에 어르신 무응답(30초 안에 버튼 안 누름), 또는 ② 바이탈 위험 범위 2개 이상 + 점수 합 7점 이상(최신 측정값). ②는 README 기준으로 켜 둠 (10/12, `ENABLE_AUTO_119_VITAL = True`). ①은 워치 확인이 꺼져 있어 동작하지 않음.
 
 ## 5. 말투
 
