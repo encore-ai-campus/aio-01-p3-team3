@@ -1,5 +1,8 @@
 # 상옥 첫 개발 묶음 — 연결 안내
 
+heat + vital 캐시 시연은 [캐시 시연 준비](autohealing_cache_demo.md)를 따르세요.
+시뮬레이터 전송만으로는 캐시가 준비되지 않으며, 동일 프로필·scenario의 정상 Vital 조회가 필요합니다.
+
 ## 2026-10-12 프로필 지역 연결
 
 profiles.area는 선택 TEXT 컬럼입니다. 기존 DB 초기화 시 컬럼이 없으면 추가하고,

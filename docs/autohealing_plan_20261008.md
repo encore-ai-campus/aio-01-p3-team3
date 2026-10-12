@@ -1,5 +1,12 @@
 # 상옥 AutoHealing 수정 개발 계획 — 2026-10-08
 
+## 2026-10-12 heat 캐시 시연 연결 기록
+
+전송기 payload에 scenario를 추가하여 일반 스트림으로 잘못 저장되는 문제를 수정했다.
+실제 전송기 payload → 수집 API → 임시 SQLite → 정상 Vital 조회 → 장애 시 캐시 복구를
+통합 시험했다. 캐시 복구 중 MCP Mock이 호출되지 않음과 측정 시각·scenario 격리를 확인했다.
+시연 준비는 docs/autohealing_cache_demo.md를 따른다. 대체 Mock 자동 캐시 저장 정책은 유지한다.
+
 ## 2026-10-12 기화 요청: 프로필 area 구현 기록
 
 profiles.area 컬럼과 기존 DB 컬럼 추가, 명시적 컬럼명 기반 시드 저장,
