@@ -53,7 +53,7 @@ with header:
     st.title(f"💚 {account.elder_name} 실시간 케어")
     st.markdown(
         f'<div class="care-account"><span>{escape(account.guardian_name)} 님으로 로그인했습니다</span>'
-        f'<span class="care-account-badge">{escape(account.elder_name)} · 취약도 {escape(account.vulnerability)}</span></div>',
+        f'<span class="care-account-badge care-vulnerability-{ {"하": "low", "중": "medium", "상": "high"}.get(account.vulnerability, "unknown") }">{escape(account.elder_name)} · 취약도 {escape(account.vulnerability)}</span></div>',
         unsafe_allow_html=True,
     )
 with logout_column:
