@@ -110,7 +110,11 @@
                 │          │          │
                 └──────────┼──────────┘
                            ▼
-                Validation (PASS / RETRY / FAIL)
+       Agent 내부 검사·복구 (Vital/IoT: model_validate,
+             CCTV: 출력 계약 검사 → AutoHealing 재시도)
+                           │
+       Orchestrator Validation (최종 VALID / INVALID)
+                           │
                        Join Guard
                        Aggregator
                            │

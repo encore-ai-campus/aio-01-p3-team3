@@ -11,6 +11,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from src.rules.risk import cctv_contract_errors
 from src.schemas import CareStatusResult
 
 
@@ -29,54 +30,12 @@ class ValidationResult:
     errors: tuple[str, ...] = ()
 
 
-def _plain(value: Any) -> Any:
-    """Pydantic 객체와 일반 dict를 같은 방식으로 검사할 수 있게 변환."""
-    if hasattr(value, "model_dump"):
-        return value.model_dump()
-    return value
-
-
-def cctv_contract_errors(value: Any) -> list[str]:
-    """README CCTV 계약을 검사한다.
-
-    analyzed만 관찰 필수 필드를 요구합니다. unavailable/failed는 정상적인
-    판단 불가 결과이므로 관찰 필드가 비어 있어도 오류가 아닙니다. 특히
-    False는 유효한 관찰값이며, None/누락과 구분합니다. 빈 description도
-    팀 합의에 따라 허용합니다.
-
-    참고: 현재 체크아웃에는 해든 님이 공유한 rules.risk.cctv_contract_errors
-    함수가 아직 없으므로, 같은 계약을 이 파일에 둡니다. 해당 구현이 합쳐지면
-    중복 구현을 제거하고 공용 함수로 연결하면 됩니다.
-    """
-    raw = _plain(value)
-    if not isinstance(raw, dict):
-        return ["cctv_not_object"]
-
-    status = raw.get("status", "unavailable")
-    if status in ("failed", "unavailable"):
-        return []
-    if status != "analyzed":
-        return ["cctv_status_invalid"]
-
-    errors: list[str] = []
-    # 값의 truthiness가 아니라 존재와 자료형을 확인해 False를 허용한다.
-    for key in ("person_visible", "fall_suspected"):
-        if key not in raw or type(raw[key]) is not bool:
-            errors.append(f"cctv_{key}_missing_or_invalid")
-
-    posture_values = {"standing", "sitting", "lying", "fallen", "none"}
-    posture = raw.get("posture")
-    if not isinstance(posture, str) or posture not in posture_values:
-        errors.append("cctv_posture_missing_or_invalid")
-
-    # README는 문자열 필수만 규정한다. 빈 문자열은 현재 팀 결정상 허용한다.
-    if "description" not in raw or not isinstance(raw["description"], str):
-        errors.append("cctv_description_missing_or_invalid")
-    return errors
-
-
 def validate_cctv_candidate(value: Any) -> bool:
-    """AutoHealing에 전달할 CCTV 검증 콜백. False면 기존 정책으로 재시도."""
+    """AutoHealing에 전달할 CCTV 검증 콜백. False면 기존 정책으로 재시도.
+
+    최종 판정에서도 쓰는 risk.py의 공용 계약 검사기를 재사용해 두 경로의
+    필수 키·자료형·빈 description 정책이 달라지지 않게 한다.
+    """
     return not cctv_contract_errors(value)
 
 
