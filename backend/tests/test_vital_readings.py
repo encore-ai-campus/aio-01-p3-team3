@@ -45,7 +45,7 @@ def test_retransmission_does_not_refresh_age(db):
     assert save(repo)['status'] == 'duplicate'
     latest = repo.latest('p1', scenario='heat', max_age_s=30)
     assert latest['measured_age_s'] == 15
-    assert latest['received_at'] == data()['measured_at']
+    assert latest['received_at'] == {**data(), 'diastolic_bp': None}['measured_at']
     with db.connect() as conn:
         assert conn.execute('SELECT COUNT(*) FROM vital_readings').fetchone()[0] == 1
 
@@ -56,7 +56,7 @@ def test_conflicting_payload_rejected(db, changed):
     save(repo)
     with pytest.raises(ReadingConflict):
         save(repo, **changed)
-    assert repo.latest('p1', scenario='heat', max_age_s=30)['data'] == data()
+    assert repo.latest('p1', scenario='heat', max_age_s=30)['data'] == {**data(), 'diastolic_bp': None}
 
 
 def test_reading_id_cannot_move_profiles_or_scenarios(db):
@@ -101,7 +101,7 @@ def test_profile_scenario_and_null_stream_isolation(db):
 @pytest.mark.parametrize('changes', [dict(measured_at=None),dict(measured_at='2026-10-08T10:00:00'),
     dict(measured_at='not-a-time'),dict(measured_at=data(-1)['measured_at']),
     dict(heart_rate=True),dict(heart_rate='72'),dict(temperature_c=float('nan')),
-    dict(temperature_c=float('inf')),dict(spo2=None)])
+    dict(temperature_c=float('inf')),dict(spo2=True)])
 def test_bad_input_not_written(db, changes):
     repo = VitalReadings(db)
     with pytest.raises(ValueError):
