@@ -10,6 +10,7 @@
 # 2026-10-08 해든 (main 문서 개정판): docs/scenarios.md 기준(NEWS2, fall SpO2 96)으로 기대값을 바꿈. critical 119는 해든 결정으로 승인 요청 유지.
 # 2026-10-12 해든: README대로 critical(VITAL_SEVERE) 119 자동 연결, 에어컨 조치 값에 action 추가에 맞춰 기대값을 바꿈.
 # 2026-10-12 해든: 60초 무응답 자동 연결 설정(ENABLE_TIMEOUT_119)을 추가. 팀 의견으로 기본 켜짐, 껐을 때 동작은 monkeypatch로 확인.
+# 2026-10-12 해든 (주석 정리): 최종 결정(기화, #27)으로 기본값은 False(자동 연결 안 함). 켠 경우의 동작만 monkeypatch로 확인.
 
 import json
 

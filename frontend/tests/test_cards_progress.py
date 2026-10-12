@@ -76,9 +76,9 @@ def test_cards_and_progress_show_this_run_immediately(monkeypatch):
     assert not after.exception
     metrics = {m.label: m.value for m in after.metric}    # 버튼을 누른 바로 그 실행에서 값이 보여야 함
     assert metrics["심박"] == "80 bpm" and metrics["실내 온도"] == "26.0 ℃" and metrics["습도"] == "55 %"
-    assert any("인덕션: **켜짐 · 120분 · 300℃**" in m.value for m in after.markdown)
+    assert any("인덕션" in m.value and "켜짐 · 120분 · 300℃" in m.value for m in after.markdown)   # 기기 줄
     assert any("위험 판정: 이상 없음" in m.value for m in after.markdown)   # 진행 표시
-    assert any('care-progress-label' in item.value and '이상 없음' in item.value for item in after.markdown)
+    assert any('class="state">이상 없음<' in m.value for m in after.markdown)   # 진행 줄 오른쪽 상태 글자
 
 
 def test_missing_vital_shows_sensor_warning(monkeypatch):

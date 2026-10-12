@@ -15,6 +15,7 @@
 # [팀 합의] 두나 님: FakeTools의 함수 이름·인자·반환 형식이 실제 MCP 도구와 같아야 합니다. 다르면 알려 주세요.
 # 2026-10-08 해든 (main 문서 개정판): 기대값을 docs/scenarios.md로. critical 119는 해든 결정으로 승인 요청 유지, 자동 연결 알림에도 캡처 안내.
 # 2026-10-12 해든 (README 9장 최종 맞춤): CCTV 약한 의심 = 경고(CCTV_SUSPECT_IS_CRITICAL False), 119 60초 무응답 자동 연결은 팀 의견으로 유지(ENABLE_TIMEOUT_119 True). 반대 설정은 monkeypatch로 확인.
+# 2026-10-12 해든 (주석 정리): 위 줄의 "60초 무응답 자동 연결 유지"는 최종 결정(기화, #27)으로 뒤집힘. 기본값 False, 켠 경우만 monkeypatch로 확인.
 
 import pytest
 

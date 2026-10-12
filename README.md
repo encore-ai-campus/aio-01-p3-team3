@@ -543,17 +543,38 @@ CCTV 캡처처럼 보이는 이미지를 시나리오별로 미리 준비해 두
 
 실제 CCTV 영상이나 모르는 사람의 사진은 쓰지 않고, 팀원이 연출해 찍은 사진이나 일러스트를 사용합니다. 화면 위쪽에 날짜·시각과 `CAM 01` 같은 글씨를 넣고 흑백·저화질로 바꿔 CCTV 캡처처럼 만듭니다.
 
-**프롬프트**
+**프롬프트** (전체 문구는 `mcp_server/src/vision/prompt.py`)
+
+비전 LLM에게는 "낙상인가"를 묻지 않고 **이미지에 보이는 사실 4개**만 묻습니다. 자세와 낙상 의심은 코드 표(`analyzer.py` `FACT_RULES`)가 정합니다. LLM이 판단을 바꾸지 못하게 하고, 같은 사진이면 같은 판정이 나오게 하기 위해서입니다.
+
 ```
-너는 어르신 돌봄용 CCTV 화면을 확인하는 도우미다.
-이미지에 보이는 것만 근거로 판단한다. 보이지 않는 것은 추측하지 않는다.
-아래 JSON 형식으로만 답한다.
+너는 어르신 돌봄용 CCTV 화면에서 보이는 사실만 적는 도우미다.
+낙상인지, 위험한지는 판단하지 않는다. 이미지에 보이는 것만으로 답한다.
+모르면 추측하지 말고 unclear로 답한다.
+"쓰러졌다", "사망" 같은 확정 표현은 쓰지 않고 "~로 보입니다"로 쓴다.
 
 {"person_visible": true/false,
- "posture": "standing" | "sitting" | "lying" | "fallen" | "none",
- "fall_suspected": true/false,
- "description": "보호자에게 보여줄 한 문장 설명"}
+ "body_support": "floor" | "furniture" | "unclear" | "none",
+ "body_shape": "upright" | "seated" | "horizontal" | "unclear" | "none",
+ "image_clear": true/false,
+ "description": "보호자에게 보여줄 한 문장 설명 (60자 이내)"}
 ```
+
+**사실 → 판정 (코드 표 `FACT_RULES`)**
+
+| 몸 모양 (`body_shape`) | 몸이 닿은 곳 (`body_support`) | `posture` | `fall_suspected` |
+| --- | --- | --- | --- |
+| upright | 어디든 | standing | false |
+| seated | furniture / unclear | sitting | false |
+| seated | floor (바닥에 주저앉음) | sitting | **true** |
+| horizontal | furniture (소파·침대에 누움) | lying | false |
+| horizontal | floor / unclear | fallen | **true** |
+| unclear | floor / unclear | fallen | **true** |
+| unclear | furniture | sitting | false |
+
+- 사람이 없으면 `person_visible: false`, `posture: "none"`.
+- `image_clear`가 false이거나 답에 unclear가 있으면 신뢰도(`confidence`)는 0.4(낮음), 아니면 0.9입니다.
+- backend로 가는 결과는 README 형식 4항목(`person_visible`, `posture`, `fall_suspected`, `description`)과 `confidence`, `status`입니다. 분석에 성공(`status: "analyzed"`)하면 4항목이 모두 있어야 합니다.
 
 **결과 사용**
 - `posture: "fallen"`이고 신뢰도가 낮지 않으면 낙상 축이 **위급**이 됩니다(바이탈과 상관없음). 흐린 사진이나 자세와 플래그가 어긋나면 "낙상 의심(확인 필요)"으로 **경고**입니다. (9장)
