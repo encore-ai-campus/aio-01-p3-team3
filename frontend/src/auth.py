@@ -43,6 +43,10 @@ class DemoAccount:
     def elder_name(self) -> str:
         return PROFILE_DISPLAY[self.profile_id]["elder"]
 
+    @property
+    def vulnerability(self) -> str:
+        return PROFILE_DISPLAY[self.profile_id]["vulnerability"]
+
 
 def parse_accounts(raw: str | None) -> dict[str, DemoAccount]:
     """DEMO_ACCOUNTS 문자열 → {아이디: 계정}. 형식이 틀리면 ValueError."""
