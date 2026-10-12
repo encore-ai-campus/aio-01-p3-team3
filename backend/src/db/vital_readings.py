@@ -1,5 +1,8 @@
 """Storage primitives for HTTP simulator ingestion; no freshness or API policy implied."""
 
+# [변경 기록]
+# 2026-10-12 해든 (팀 합의, 해든 요청): 확장기 혈압(diastolic_bp)을 저장 필드·테이블에서 삭제. 남아 있는 DB는 열을 빼고 다시 만듦.
+
 import math
 import sqlite3
 import time
@@ -7,7 +10,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 
-VITAL_FIELDS = ('heart_rate', 'systolic_bp', 'diastolic_bp', 'temperature_c', 'spo2')
+# [팀 합의] 10/12: 확장기 혈압(diastolic_bp)은 쓰지 않기로 해 저장 필드에서 뺌 (docs/scenarios.md 5번).
+VITAL_FIELDS = ('heart_rate', 'systolic_bp', 'temperature_c', 'spo2')
 
 
 class ReadingConflict(ValueError):
@@ -88,9 +92,9 @@ class VitalReadings:
                             raise ReadingConflict('reading_id already used for another payload')
                         return {'status': 'duplicate', 'id': previous['id'], 'reading_id': reading_id, 'attempts': attempt}
                     cursor = conn.execute('''INSERT INTO vital_readings
-                        (reading_id,profile_id,scenario,heart_rate,systolic_bp,diastolic_bp,
+                        (reading_id,profile_id,scenario,heart_rate,systolic_bp,
                          temperature_c,spo2,measured_at,measured_at_epoch,received_at,received_at_epoch)
-                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)''',
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
                         (reading_id, profile_id, scenario, *values, measured_at, measured_epoch,
                          received_at, received_epoch))
                     row_id = cursor.lastrowid

@@ -36,7 +36,7 @@ def test_adapter_returns_same_row_id_and_keeps_none(db):
     first = service.save_vital_reading(reading)
     assert type(first) is int
     assert service.save_vital_reading(reading) == first
-    assert service.get_latest_vital_reading('p1',scenario='heat',max_age_seconds=30) == {**data(), 'diastolic_bp': None}
+    assert service.get_latest_vital_reading('p1',scenario='heat',max_age_seconds=30) == data()
     assert service.get_latest_vital_reading('absent',max_age_seconds=30) is None
 
 
