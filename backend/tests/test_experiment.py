@@ -10,4 +10,4 @@ def test_experiment_evidence_and_metrics_match(tmp_path):
     assert all(r['expected_behavior_passed'] and r['logs'] for r in saved['records'])
     assert saved['metrics']['recovery_rate_percent'] == 50
     assert saved['source_sha256']
-    assert (tmp_path/'report.md').exists()
+    assert (tmp_path/'1012_장애복구_시험결과_상옥.md').exists()

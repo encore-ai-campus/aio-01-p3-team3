@@ -183,9 +183,9 @@ CCTV 숫자 confidence 보존·중복 재시도, 실제 LLM·화면 확인은 �
 ## 재실행
 
 backend에서 `python -m src.healing.experiment --output ../docs/evidence/autohealing_20261012` 실행.
-results.json과 report.md를 새 실행 결과로 갱신한다. 임시 DB는 실행 후 제거된다.
+results.json과 1012_장애복구_시험결과_상옥.md를 새 실행 결과로 갱신한다. 임시 DB는 실행 후 제거된다.
 '''
-    (output/'report.md').write_text(report,encoding='utf-8')
+    (output/'1012_장애복구_시험결과_상옥.md').write_text(report,encoding='utf-8')
     return result
 
 
