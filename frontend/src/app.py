@@ -2,9 +2,10 @@
 
 보호자(자녀) 한 명이 로그인하면 연결된 어르신(부모) 한 분의 상태만 본다.
 시연용 데모 계정 4개로만 로그인한다 (회원가입 없음, src/auth.py).
-화면 순서 (README 10장): 진행 표시 → 바이탈·실내기기 카드 → 위험도·승인·CCTV(두나 님 approval.py) → AutoHealing 로그
-[팀 합의] 10/12 해든: 수언 님 시안(index-2.html) 배치로 바꿈. 머리글·어르신 배너·처리 과정 줄 아래에
-왼쪽 열은 바이탈·주거 환경(CCTV 포함) 카드, 오른쪽 열은 위험도·승인 카드와 실행 과정(AutoHealing) 카드.
+화면 순서 (README 10장): 머리글·어르신 배너 → 진행 표시 → 위험도 배너·조치안·승인(두나 님 approval.py, 전체 폭)
+→ 왼쪽 바이탈·주거 환경(CCTV 포함) 카드 / 오른쪽 실행 과정(AutoHealing) 카드
+[팀 합의] 10/12 해든: 수언 님 시안(index-2.html) 느낌의 테마·머리글·어르신 배너·두 열 카드.
+[팀 합의] 10/12 기화: 보호자가 처음 보는 화면 맨 위에 위험도와 승인할 조치안이 크게 보이도록 위험·승인 카드를 전체 폭으로 올림.
 """
 
 import os
@@ -74,21 +75,21 @@ with logout_column:
         log_out()
         st.rerun()
 
-# 배너·진행 표시·카드 자리를 먼저 잡고, 두나 님 워크플로가 이번 실행 결과를 저장한 뒤에 채운다.
+# 자리를 먼저 잡고, 두나 님 워크플로가 이번 실행 결과를 저장한 뒤에 채운다.
 # (먼저 그리면 "상태 확인하기"를 누른 그 실행에서 이전 결과가 보이기 때문)
 banner_area = st.container()
 progress_area = st.container()
-left_column, right_column = st.columns([1.7, 1], gap="medium")
-with left_column:
-    status_area = st.container()
 
 backend_url = os.getenv("BACKEND_URL", "http://127.0.0.1:8000")
-with right_column:
-    with st.container(key="alert_card"):
-        st.markdown('<p class="ok-card-title">위험 판정과 보호자 승인</p>'
-                    '<div class="ok-card-sub">Emergency Agent · 기기 제어와 119는 승인 후 실행</div>',
-                    unsafe_allow_html=True)
-        render_care_workflow(backend_url, profile_id=account.profile_id)
+# 첫 화면 맨 위: 위험도 배너 → 보호자 조치 승인(조치안·승인 버튼) → 결과 (전체 폭)
+with st.container(key="alert_card"):
+    st.markdown('<p class="ok-card-title">위험 판정과 보호자 승인</p>'
+                '<div class="ok-card-sub">Emergency Agent · 기기 제어와 119는 승인 후 실행</div>',
+                unsafe_allow_html=True)
+    render_care_workflow(backend_url, profile_id=account.profile_id)
+
+# 그 아래: 왼쪽 측정값 카드 / 오른쪽 AutoHealing 로그
+left_column, right_column = st.columns([1.7, 1], gap="medium")
 
 run_response = st.session_state.get("run_response")
 run_mapping = run_response if isinstance(run_response, dict) else {}
@@ -100,9 +101,8 @@ with banner_area:
                 unsafe_allow_html=True)
 with progress_area:
     render_progress(run_response, st.session_state.get("approval_result"))
-with status_area:
+with left_column:
     render_status_cards(run_response, backend_url)
-
 with right_column:
     with st.container(key="logs_card"):
         render_autohealing_logs(backend_url, run_mapping.get("run_id"))

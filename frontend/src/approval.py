@@ -7,6 +7,7 @@ from typing import Literal
 
 import streamlit as st
 
+from .components.risk_banner import render_risk_banner
 from .api_client import (
     BackendAPIError,
     fetch_cctv_image,
@@ -95,25 +96,12 @@ def get_approval_actions(emergency: Mapping[str, object] | None) -> list[dict[st
     ]
 
 
-def _render_risk(emergency: Mapping[str, object]) -> None:
-    risk_level = str(emergency.get("risk_level", "정상"))
-    label = RISK_LABELS.get(risk_level, risk_level)
-    message = f"위험도: {label}"
-
-    if risk_level == "위급":
-        st.error(message)
-    elif risk_level == "경고":
-        st.warning(message)
-    elif risk_level == "주의":
-        st.warning(message)
-    else:
-        st.info(message)
-
-    reasons = emergency.get("reasons")
-    if isinstance(reasons, list) and reasons:
-        st.markdown("**판정 근거**")
-        for reason in reasons:
-            st.write(f"- {reason}")
+def _render_risk(
+    emergency: Mapping[str, object],
+    care_status: Mapping[str, object] | None = None,
+) -> None:
+    # 기화 10/12: 첫 화면에서 위험도를 크게, 판정 근거를 측정값과 함께 보여 주는 배너로 바꿈
+    render_risk_banner(emergency, care_status)
 
 
 def _render_actions(emergency: Mapping[str, object]) -> None:
@@ -196,10 +184,7 @@ def render_approval_result(result: Mapping[str, object]) -> None:
     else:
         st.error("조치 처리 중 문제가 발생했습니다.")
 
-    current_step = result.get("current_step")
-    if current_step:
-        st.caption(f"현재 단계: {current_step}")
-
+    # 진행 상황(current_step)은 화면 위 진행 표시(components/progress.py)가 보여 준다 (기화 10/12)
     actions = result.get("actions")
     if isinstance(actions, list):
         for action in actions:
@@ -317,11 +302,14 @@ def render_approval_panel(
         return
 
     status = str(run_response.get("status", "fail"))
-    current_step = run_response.get("current_step")
-    if current_step:
-        st.caption(f"현재 단계: {current_step}")
+    # 진행 상황(current_step)은 화면 위 진행 표시가 보여 준다 (기화 10/12)
+    care_status = run_response.get("care_status")
+    care_mapping = care_status if isinstance(care_status, dict) else None
 
     if status == "no_issue":
+        emergency = run_response.get("emergency")
+        if isinstance(emergency, dict):
+            _render_risk(emergency, care_mapping)
         st.success(str(run_response.get("message") or "현재 확인된 이상 징후가 없습니다."))
         return
     if status == "fail":
@@ -331,11 +319,9 @@ def render_approval_panel(
     if status in {"done", "rejected"}:
         emergency = run_response.get("emergency")
         emergency_mapping = emergency if isinstance(emergency, dict) else None
-        care_status = run_response.get("care_status")
-        care_mapping = care_status if isinstance(care_status, dict) else None
 
         if emergency_mapping:
-            _render_risk(emergency_mapping)
+            _render_risk(emergency_mapping, care_mapping)
             _render_actions(emergency_mapping)
         # CCTV is shown in the dashboard status card.
 
@@ -364,9 +350,9 @@ def render_approval_panel(
     care_mapping = care_status if isinstance(care_status, dict) else None
     emergency_mapping = emergency if isinstance(emergency, dict) else None
 
-    st.subheader("보호자 조치 승인")
     if emergency_mapping:
-        _render_risk(emergency_mapping)
+        _render_risk(emergency_mapping, care_mapping)   # 위험도를 맨 위에 크게
+        st.subheader("보호자 조치 승인")
         remaining = emergency_mapping.get("remaining_seconds")
         if isinstance(remaining, (int, float)):
             st.metric("승인 남은 시간", f"{max(0, int(remaining))}초")
