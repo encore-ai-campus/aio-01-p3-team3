@@ -44,11 +44,11 @@ class CareRunRequest(BaseModel):
 # ---------- 두나 담당 MCP 조회 결과 ----------
 
 class VitalData(BaseModel):
-    # 유효한 Vital 조회 결과에 필요한 값
-    heart_rate: int
-    systolic_bp: int = Field(title="최고 혈압")
-    temperature_c: float
-    spo2: int
+    # 팀 합의 센서 오류 범위. 위험도 경계(rules/risk.py)와는 별개다.
+    heart_rate: int = Field(ge=20, le=250, description="심박수(회/분)")
+    systolic_bp: int = Field(ge=50, le=260, title="최고 혈압")
+    temperature_c: float = Field(ge=30, le=43, description="체온(°C)")
+    spo2: int = Field(ge=50, le=100, description="산소포화도(%)")
 
     # 측정 시각이 없는 Mock 상황도 허용
     measured_at: str | None = None
@@ -62,18 +62,19 @@ class VitalReadingCreate(BaseModel):
     # 필수: 바이탈 데이터가 속한 어르신 ID. 공백 문자열은 허용하지 않음
     profile_id: str = Field(min_length=1, description="바이탈 데이터가 속한 어르신 ID")
 
-    # 필수: 실제 측정한 심박수(회/분). 0 이하 값은 허용하지 않음
-    heart_rate: int = Field(gt=0, description="실제 측정한 심박수(회/분)")
+    # 저장 API에도 조회와 동일한 합의 범위를 적용한다.
+    heart_rate: int = Field(ge=20, le=250, description="실제 측정한 심박수(회/분)")
 
     # 선택: 측정 장비나 전송 상황에 따라 값이 없을 수 있음
-    systolic_bp: int | None = Field(default=None, title="최고 혈압")
+    systolic_bp: int | None = Field(default=None, ge=50, le=260, title="최고 혈압")
+    # 프로젝트 합의 범위 대상은 수축기 혈압이다. 최저혈압 범위는 별도 합의 전이라 유지한다.
     diastolic_bp: int | None = Field(default=None, title="최저 혈압")
-    temperature_c: float | None = Field(default=None, description="체온(°C)")
+    temperature_c: float | None = Field(default=None, ge=30, le=43, description="체온(°C)")
     spo2: int | None = Field(
         default=None,
-        ge=0,
+        ge=50,
         le=100,
-        description="산소포화도(%). 값이 있는 경우 0~100 범위",
+        description="산소포화도(%). 값이 있는 경우 합의한 50~100 범위",
     )
 
     # 필수: HTTP 전송 시각이 아니라 심박수를 실제로 측정한 시각
@@ -100,9 +101,11 @@ class VitalReadingResponse(BaseModel):
 
 
 class IndoorEnvironment(BaseModel):
-    # 유효한 실내 환경 조회 결과에 필요한 값
-    temperature_c: float
-    humidity_percent: float
+    # 팀 합의 센서 오류 범위. 25°C 전후의 실내값도 유효하다.
+    temperature_c: float = Field(ge=-10, le=60)
+    # 습도만 잘못된 경우 온도를 살리기 위해 선택값으로 표현한다.
+    # 범위 판정과 None 정리는 Agent 복구 경로에서 수행한다.
+    humidity_percent: float | None = None
 
 
 class DeviceStatus(BaseModel):

@@ -9,6 +9,7 @@ import asyncio
 from src.agents.iot import run_iot
 from src.agents.profile import run_profile
 from src.agents.vital import run_vital
+from src.orchestrator.validation import ValidationStatus, validate_care_status
 from src.schemas import CareStatusResult
 
 
@@ -29,7 +30,7 @@ async def run_monitoring(*, db, run_id: str, profile_id: str, scenario: str, fau
         _profile(db, profile_id),
     )
     errors = [e for e in (vital["error"], profile["error"]) if e] + iot["errors"]
-    return CareStatusResult(
+    care_status = CareStatusResult(
         run_id=run_id,
         profile_id=profile_id,
         scenario=scenario,
@@ -43,3 +44,10 @@ async def run_monitoring(*, db, run_id: str, profile_id: str, scenario: str, fau
         source=vital["source"] or "mock",
         errors=errors,
     )
+
+    # 각 Agent의 복구가 끝난 뒤 실행하는 최종 계약 검사다.
+    # 여기서 Agent를 다시 호출하지 않고, 오류를 보존해 Join Guard에 넘긴다.
+    validation = validate_care_status(care_status)
+    if validation.status is ValidationStatus.INVALID:
+        care_status.errors.extend(validation.errors)
+    return care_status

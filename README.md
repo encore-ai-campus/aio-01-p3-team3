@@ -188,16 +188,17 @@ def vulnerability(p):
 
 모든 Guard는 **LLM이 아닌 코드 규칙**으로 구현합니다.
 
-### Validation (에이전트 결과 개별 검사 → PASS / RETRY / FAIL)
+### Validation (Agent 복구 중 계약 검사 + Orchestrator 최종 확인)
 
 | 대상          | 검사 내용                                                                             | 실패 시                 |
 | ------------- | ------------------------------------------------------------------------------------- | ----------------------- |
-| Vital         | 값이 존재하고 측정 가능한 범위인가 (센서 오류값 걸러내기)                             | RETRY                   |
-| IoT 실내 환경 | 온도·습도가 측정 가능한 범위인가                                                      | RETRY                   |
-| CCTV 분석     | JSON 파싱, 필수 키(`person_visible`, `posture`, `fall_suspected`, `description`) 존재 | RETRY                   |
+| Vital         | 필수 값이 존재하고 센서 측정 범위인가: 심박 20–250회/분, 최고혈압 50–260mmHg, 체온 30–43℃, SpO₂ 50–100% | RETRY |
+| IoT 실내 환경 | 온도 −10–60℃. 습도 0–100%RH 범위 밖이면 온도는 살리고 습도만 제외 | 온도 RETRY, 습도 필드만 제외 |
+| CCTV 분석     | `analyzed`이면 JSON 필수 키와 자료형 확인. `False`는 유효값이며 `description` 빈 문자열 허용. `failed`/`unavailable`은 관찰값 없이 허용 | RETRY |
 | LLM 출력      | JSON 파싱, 필수 키 존재 여부                                                          | RETRY 1회 → 템플릿 대체 |
 
-- RETRY는 **최대 3회**(CCTV 분석은 2회), 넘으면 FAIL
+- 재시도 중 계약 검사는 Agent의 AutoHealing 콜백이 수행한다. Vital·IoT는 최초 요청 포함 총 3회, CCTV 분석은 최초 요청 포함 최대 3회(추가 재시도 2회) 시도한다.
+- Orchestrator Validation은 복구 후 최종 결과를 `VALID`/`INVALID`로 확인해 오류를 보존한다. 이 단계에서 Agent를 다시 호출하지 않는다.
 - FAIL이면 해당 정보 없이 진행하거나 안전 종료하고, 보호자에게 알린 뒤 로그에 기록
 
 ### Join Guard (결과가 모두 모였는가)
