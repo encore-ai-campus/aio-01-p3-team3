@@ -100,7 +100,8 @@ render_approval_panel(
         "조치 승인 및 실행",
         "조치 거절",
     ]
-    assert any("위험도: 위급" in error.value for error in app.error)
+    # 기화 10/12: 위험도는 st.error 대신 첫 화면 맨 위의 큰 배너(components/risk_banner.py)로 표시
+    assert any("care-risk" in item.value and "위급" in item.value for item in app.markdown)
 
 
 def test_notification_only_does_not_render_approval_buttons() -> None:

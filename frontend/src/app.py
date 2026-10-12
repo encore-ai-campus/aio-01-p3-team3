@@ -2,7 +2,7 @@
 
 보호자(자녀) 한 명이 로그인하면 연결된 어르신(부모) 한 분의 상태만 본다.
 시연용 데모 계정 4개로만 로그인한다 (회원가입 없음, src/auth.py).
-화면 순서 (README 10장): 진행 표시 → 바이탈·실내기기 카드 → 위험도·승인·CCTV(두나 님 approval.py) → AutoHealing 로그
+화면 순서 (README 10장): 진행 표시 → 위험도 배너·조치안·승인(두나 님 approval.py) → 바이탈·실내기기·CCTV 카드 → AutoHealing 로그
 """
 
 import os
@@ -42,12 +42,6 @@ if account is None:
         render_login(accounts)
     st.stop()
 
-st.markdown('''<section class="care-hero"><div><div class="care-tag">FAMILY CARE · 보호자 전용</div>
-<h2>떨어져 있어도,<br>어르신의 하루를 함께 살펴보세요.</h2>
-<p>몸 상태와 집 안 환경을 한눈에 확인하고 필요한 조치를 선택하세요.<br>
-현재 서비스는 가상 데이터와 Mock 조치로 진행하는 시연입니다.</p></div>
-<div class="care-orbit" aria-hidden="true">♡</div></section>''', unsafe_allow_html=True)
-
 header, logout_column = st.columns([3, 1])   # 좁은 창에서도 "로그아웃" 글자가 잘리지 않게
 with header:
     st.title(f"💚 {account.elder_name} 실시간 케어")
@@ -61,17 +55,22 @@ with logout_column:
         log_out()
         st.rerun()
 
-# 진행 표시·카드 자리를 먼저 잡고, 두나 님 워크플로가 이번 실행 결과를 저장한 뒤에 채운다.
+# 첫 화면 순서 (기화 10/12): 진행 표시 → 위험도 배너·조치안·승인 버튼(두나 님 워크플로) → 측정값 카드 → 로그
+# 자리를 먼저 잡고 워크플로가 이번 실행 결과를 저장한 뒤에 채운다.
 # (먼저 그리면 "상태 확인하기"를 누른 그 실행에서 이전 결과가 보이기 때문)
-status_area = st.container()
+progress_area = st.container()
+decision_area = st.container()
+cards_area = st.container()
 
 backend_url = os.getenv("BACKEND_URL", "http://127.0.0.1:8000")
-render_care_workflow(backend_url, profile_id=account.profile_id)
+with decision_area:
+    render_care_workflow(backend_url, profile_id=account.profile_id)
 
 run_response = st.session_state.get("run_response")
-with status_area:
+with progress_area:
     render_progress(run_response, st.session_state.get("approval_result"))
-    st.markdown('<div class="care-section">오늘의 돌봄 상태</div>', unsafe_allow_html=True)
+with cards_area:
+    st.markdown('<div class="care-section">측정값 자세히 보기</div>', unsafe_allow_html=True)
     render_status_cards(run_response, backend_url)
 
 st.divider()
