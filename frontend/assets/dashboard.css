@@ -17,6 +17,10 @@ h1,h2,h3 {letter-spacing:-.04em;color:var(--care-ink);}
 .stButton button {border-radius:12px;min-height:44px;font-weight:600;background:#fff;color:#19354a;border:1px solid #b9d4e4;}
 .stButton button[kind="primary"],.stFormSubmitButton button[kind="primary"] {background:#087fb5;border-color:#087fb5;color:#fff;}
 [data-testid="stAlert"] {border-radius:14px;}
+[data-testid="stAlert"][data-baseweb="notification"] {color:#19354a;}
+[data-testid="stAlert"] [data-testid="stMarkdownContainer"],
+[data-testid="stAlert"] [data-testid="stMarkdownContainer"] p,
+[data-testid="stAlert"] [data-testid="stMarkdownContainer"] li {color:#19354a!important;font-weight:600;}
 .care-footnote {font-size:12px;color:#627e91;margin-top:26px;}
 .care-account {display:flex;flex-wrap:wrap;align-items:center;gap:10px;color:#29495e;font-size:16px;font-weight:600;line-height:1.7;margin:4px 0 18px;}
 .care-account-badge {background:#e5f3fb;border:1px solid #b7d8eb;padding:4px 12px;border-radius:10px;color:#215270;font-size:15px;}
