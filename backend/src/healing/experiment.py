@@ -120,7 +120,11 @@ def run_experiments(output, repeats=3):
                     if run_id:
                         pending.pop(run_id)
                     main.app.dependency_overrides.pop(main.get_db,None)
-    revision = subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo,text=True).strip()
+    try:
+        revision = subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo,text=True,
+                                           stderr=subprocess.DEVNULL).strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        revision = '확인 불가 (.git 또는 git 실행 파일 없음)'
     sources = {str(p.relative_to(repo)): hashlib.sha256(p.read_bytes()).hexdigest()
                for p in sorted((repo/'backend/src').rglob('*.py'))}
     result = dict(executed_at=datetime.now(timezone(timedelta(hours=9))).isoformat(),
@@ -174,10 +178,11 @@ DR-LLM-01: 깨진 JSON → 교정 1회 → Emergency/Summary 템플릿 안내.
 
 바이탈 이력/캐시/로그/프로필, 부분 바이탈 저장, DB 마이그레이션,
 area 전달 및 heat 캐시 준비는 구현되어 있다. 지표는 명시적 시험 결과를
-입력받아 계산하며 /logs·실시간 화면과는 아직 연결되지 않았다.
+입력받아 계산한다. /logs API는 구현되어 있으나 실시간 지표 화면과는 연결되지 않았다.
 승인 대기 정보는 메모리에 있으므로 재시작하면 사라진다.
-DB 전체 장애의 상세 메모리 진단 전달과 통합 알림, 센서 범위 변경 연결,
+DB 전체 장애의 상세 메모리 진단 전달과 통합 알림,
 CCTV 숫자 confidence 보존·중복 재시도, 실제 LLM·화면 확인은 남은 통합 과제다.
+센서 범위·습도 부분 실패·로그 API는 별도 회귀 시험으로 확인했다.
 본 작업에서 위험도·최신성·source·재시도 정책은 변경하지 않았다.
 
 ## 재실행
