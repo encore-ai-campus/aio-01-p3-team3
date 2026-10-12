@@ -22,7 +22,6 @@ CREATE TABLE IF NOT EXISTS vital_readings (
     scenario TEXT,
     heart_rate INTEGER NOT NULL,
     systolic_bp INTEGER,
-    diastolic_bp INTEGER,
     temperature_c REAL,
     spo2 INTEGER,
     measured_at TEXT NOT NULL,

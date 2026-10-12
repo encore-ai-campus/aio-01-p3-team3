@@ -45,7 +45,7 @@ def test_retransmission_does_not_refresh_age(db):
     assert save(repo)['status'] == 'duplicate'
     latest = repo.latest('p1', scenario='heat', max_age_s=30)
     assert latest['measured_age_s'] == 15
-    assert latest['received_at'] == {**data(), 'diastolic_bp': None}['measured_at']
+    assert latest['received_at'] == data()['measured_at']
     with db.connect() as conn:
         assert conn.execute('SELECT COUNT(*) FROM vital_readings').fetchone()[0] == 1
 
@@ -56,7 +56,7 @@ def test_conflicting_payload_rejected(db, changed):
     save(repo)
     with pytest.raises(ReadingConflict):
         save(repo, **changed)
-    assert repo.latest('p1', scenario='heat', max_age_s=30)['data'] == {**data(), 'diastolic_bp': None}
+    assert repo.latest('p1', scenario='heat', max_age_s=30)['data'] == data()
 
 
 def test_reading_id_cannot_move_profiles_or_scenarios(db):

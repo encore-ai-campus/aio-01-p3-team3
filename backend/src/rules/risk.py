@@ -23,7 +23,7 @@
 # 2026-10-08 해든 (승인·119 흐름): "정말 위급하면 119 바로 연결"을 넣음. 흐름 설명은 notes/승인-119-흐름.md.
 #   - 119 즉시 자동 연결 2가지: ① 위급 + 워치 확인에 어르신 무응답 ② 바이탈 위험 범위 2개 이상 + 점수 합 7점 이상(최신 측정값).
 #     이때 call_119는 needs_approval False, auto True. 보호자에게는 승인 요청이 아니라 "연락했습니다" 알림이 감.
-#   - 그 밖의 119는 승인 요청 + GUARDIAN_WAIT_119_SEC 안에 보호자 응답이 없으면 자동 연결 (on_timeout "execute").
+#   - 그 밖의 119는 승인 요청 + GUARDIAN_WAIT_119_SEC 안에 보호자 응답이 없으면 자동 연결 (on_timeout "execute"). → 10/12 최종 결정으로 꺼짐(ENABLE_TIMEOUT_119).
 #   - 기기 제어는 시간이 지나도 실행하지 않고 다시 알림만 (on_timeout "remind").
 #   - notify_guardian에 알림 종류(kind)와 재알림 시간을 붙임. after_guardian_timeout()으로 시간 초과 처리.
 # 2026-10-08 해든 (5단계 연결): device_call_args()로 조치안 값을 README control_device(device, action) 인자로 바꿈.
@@ -69,6 +69,7 @@
 #   - ENABLE_TIMEOUT_119 = False: README "그 밖의 119는 모두 보호자 승인". 60초 무응답 자동 연결을 끄고
 #     on_timeout을 "remind"(다시 알림)로. 보호자 알림의 "60초 안에 응답이 없으면 119에 자동으로 연락" 문구도 같이 빠짐.
 #   - 같은 날 팀 의견으로 60초 무응답 자동 연결은 유지하기로 정해져 ENABLE_TIMEOUT_119 = True로 되돌림 (설정값은 남김).
+#   - 최종(기화 님 PM 결정, #27): 승인 없는 119는 VITAL_SEVERE일 때만. 60초 무응답 자동 연결은 쓰지 않음 → ENABLE_TIMEOUT_119 = False.
 #
 # 모든 수치는 시연용 예시 규칙이며 의학적 기준이 아님. 발표 전 출처(NEWS2, 질병관리청, WHO) 원문 확인.
 # 팀원과 겹치는 부분에는 "# [팀 합의] 이름: 설명" 주석을 달았음. 검색: grep -n "팀 합의" risk.py

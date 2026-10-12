@@ -1,4 +1,7 @@
 """Transactional upgrade of the known original Vital table; preserve unrelated tables."""
+
+# [변경 기록]
+# 2026-10-12 해든 (팀 합의, 해든 요청): 확장기 혈압(diastolic_bp)을 저장 필드·테이블에서 삭제. 남아 있는 DB는 열을 빼고 다시 만듦.
 from pathlib import Path
 
 
@@ -13,7 +16,8 @@ def migrate_vital_readings(conn):
                 'measured_at_epoch', 'received_at', 'received_at_epoch'}
     if set(columns) not in (expected, expected | {'diastolic_bp'}):
         raise RuntimeError('Unsupported vital_readings schema; migration refused')
-    if 'diastolic_bp' in columns and all(not columns[f]['notnull'] for f in
+    # [팀 합의] 10/12: diastolic_bp 열이 남은 DB는 그 열만 빼고 다시 만든다 (다른 값은 그대로 복사).
+    if set(columns) == expected and all(not columns[f]['notnull'] for f in
                                         ('systolic_bp', 'temperature_c', 'spo2')):
         conn.commit()
         return
@@ -28,7 +32,7 @@ def migrate_vital_readings(conn):
     schema = Path(__file__).with_name('schema.sql').read_text(encoding='utf-8')
     table = schema[schema.index('CREATE TABLE IF NOT EXISTS vital_readings'):]
     conn.execute(table.split(';', 1)[0])
-    names = ','.join(columns)
+    names = ','.join(c for c in columns if c in expected)
     conn.execute(f'INSERT INTO vital_readings ({names}) SELECT {names} FROM vital_readings_old')
     conn.execute('DROP TABLE vital_readings_old')
     conn.execute('CREATE INDEX readings_latest ON vital_readings'
