@@ -89,6 +89,11 @@ def test_not_visible_wins_over_other_facts():
     assert (data["posture"], data["fall_suspected"]) == ("none", False)
 
 
+def test_empty_description_is_allowed():      # README 계약: description은 문자열이면 빈 문자열도 허용
+    data, errors = validate_cctv(raw(description=""))
+    assert errors == [] and data is not None
+
+
 def test_code_block_accepted():
     assert validate_cctv("```json\n" + raw() + "\n```")[1] == []
 
@@ -97,8 +102,8 @@ def test_code_block_accepted():
     ("사진입니다", "JSON 파싱"),
     (raw(body_shape="crawling"), "body_shape는"),
     (raw(body_support="table"), "body_support는"),
-    (raw(description="가" * 61), "description은 1~"),
-    (raw(description=""), "description은 1~"),
+    (raw(description="가" * 61), "최대 60자"),
+    (raw(description="   "), "공백이 아닌 문장"),   # 빈 문자열은 README 계약상 허용, 공백만 있는 값은 거부
     (raw(description="바닥에 있습니다. 움직이지 않습니다."), "한 문장"),
     (raw(body_shape="horizontal", description="어르신이 쓰러졌습니다."), "확정·진단"),
     (raw(body_shape="horizontal", description="골절이 의심됩니다."), "확정·진단"),
