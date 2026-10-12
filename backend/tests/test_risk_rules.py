@@ -14,6 +14,7 @@
 # 2026-10-08 해든 (main 문서 개정판): docs/scenarios.md 2·5·8장 기준(NEWS2, 실내 28/20·극한 31/18)으로 기대값을 바꿈. critical 119는 해든 결정으로 승인 요청.
 # 2026-10-08 해든 (확정안과 다른 부분 정리): 시연 설정에서 워치 확인을 꺼서 fall 조치가 확정안대로 3개(119·응급실·알림).
 # 2026-10-12 해든: README대로 critical(VITAL_SEVERE) 119 자동 연결, 에어컨 조치 값에 action 추가에 맞춰 기대값을 바꿈.
+# 2026-10-12 해든 (README 9장 최종 맞춤): CCTV 약한 의심 = 경고(CCTV_SUSPECT_IS_CRITICAL False), 119 시간 초과 자동 연결 끔(ENABLE_TIMEOUT_119 False). 예전 동작은 monkeypatch로 확인.
 
 import pytest
 
@@ -285,9 +286,9 @@ def test_heat_reason_has_body_temp_and_indoor():
 
 
 def test_demo_settings_follow_final_plan():
-    """docs/scenarios.md: 워치 확인은 끔(fall_event 제외), CCTV 의심은 위급. 바이탈 매우 위험이면 119 자동 연결 (README)."""
+    """README 9장: 워치 확인은 끔, CCTV 약한 의심은 경고, 시간 초과 119 없음. 바이탈 매우 위험이면 119 자동 연결."""
     import src.rules.risk as risk
-    assert risk.ENABLE_WATCH_CHECK is False and risk.CCTV_SUSPECT_IS_CRITICAL is True
+    assert risk.ENABLE_WATCH_CHECK is False and risk.CCTV_SUSPECT_IS_CRITICAL is False and risk.ENABLE_TIMEOUT_119 is False
     assert risk.ENABLE_AUTO_119 is True and risk.ENABLE_AUTO_119_VITAL is True and risk.VITAL_DANGER_FROM_NEWS2 is True and risk.ENABLE_ENV_EXTREME is True
 
 
@@ -295,9 +296,21 @@ def test_demo_settings_follow_final_plan():
     {**CCTV_FALL, "confidence": "low"},                                                     # 흐린 사진
     {"person_visible": True, "posture": "sitting", "fall_suspected": True, "description": "바닥에 앉아 계심"},  # 바닥에 주저앉음
 ])
-def test_cctv_suspicion_is_critical_with_capture(cctv):
-    """확정안: CCTV 쓰러짐 의심 → 위급. 대신 보호자가 캡처를 보고 119를 승인."""
-    r = evaluate(care("normal", "하", cctv={**cctv, "image_path": "assets/cctv/x.jpg"}), month=8)
+def test_cctv_weak_suspicion_is_warning_with_capture(cctv):
+    """README 9장 (해든 10/12): 흐린 사진·자세와 플래그 불일치는 낙상 의심(FALL_SUSPECTED) = 경고. 캡처는 그대로 붙임."""
+    r = evaluate(care("normal", "하", cctv={**cctv, "image_path": "assets/cctv/x.png"}), month=8)
+    assert r["risk_level"] == "경고" and r["fall_state"] == "suspected" and types(r) == ["notify_guardian"]
+    assert r["actions"][-1]["value"]["cctv_check"] == "fall" and r["actions"][-1]["value"]["cctv_image"] == "assets/cctv/x.png"
+
+
+@pytest.mark.parametrize("cctv", [
+    {**CCTV_FALL, "confidence": "low"},
+    {"person_visible": True, "posture": "sitting", "fall_suspected": True, "description": "바닥에 앉아 계심"},
+])
+def test_cctv_suspicion_is_critical_when_switched_on(cctv, monkeypatch):
+    """예전 확정안 설정(CCTV_SUSPECT_IS_CRITICAL = True)을 켜면 의심도 위급 + 119 승인 요청."""
+    import src.rules.risk as risk
+    monkeypatch.setattr(risk, "CCTV_SUSPECT_IS_CRITICAL", True)
+    r = evaluate(care("normal", "하", cctv={**cctv, "image_path": "assets/cctv/x.png"}), month=8)
     assert r["risk_level"] == "위급" and types(r) == ["call_119", "hospital_info", "notify_guardian"]
     assert r["actions"][0]["needs_approval"] is True
-    assert r["actions"][-1]["value"]["cctv_check"] == "fall"

@@ -14,6 +14,7 @@
 # [팀 합의] 지혜 님: 아래 care_run / care_approve 순서대로 해든 함수를 부르면 됩니다. 응답 키는 README 6장 응답 1·2와 같음.
 # [팀 합의] 두나 님: FakeTools의 함수 이름·인자·반환 형식이 실제 MCP 도구와 같아야 합니다. 다르면 알려 주세요.
 # 2026-10-08 해든 (main 문서 개정판): 기대값을 docs/scenarios.md로. critical 119는 해든 결정으로 승인 요청 유지, 자동 연결 알림에도 캡처 안내.
+# 2026-10-12 해든 (README 9장 최종 맞춤): CCTV 약한 의심 = 경고(CCTV_SUSPECT_IS_CRITICAL False), 119 시간 초과 자동 연결 끔(ENABLE_TIMEOUT_119 False). 예전 동작은 monkeypatch로 확인.
 
 import pytest
 
@@ -198,7 +199,16 @@ def test_induction_reject_tells_elder_and_guardian():
     assert not any(x[0] == "control_device" for x in tools.log)
 
 
-def test_fall_timeout_calls_119():
+def test_fall_timeout_only_reminds_by_default():
+    """README 9장: 낙상 119는 보호자 승인. 시간이 지나도 119를 걸지 않고 계속 대기 (해든 10/12)."""
+    tools = FakeTools("fall")
+    care_run(tools, "t3b")
+    r = care_approve("t3b", None)
+    assert r["status"] == "pending_approval" and not any(x[0] == "call_119" for x in tools.log)
+
+
+def test_fall_timeout_calls_119(monkeypatch):
+    monkeypatch.setattr(risk, "ENABLE_TIMEOUT_119", True)        # 꺼 둔 확장 설계
     tools = FakeTools("fall")
     care_run(tools, "t3")
     r = care_approve("t3", None)
