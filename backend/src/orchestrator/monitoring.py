@@ -18,9 +18,9 @@ async def _profile(db, profile_id: str) -> dict:
     try:
         profile = await asyncio.to_thread(db.get_profile, profile_id)
     except Exception:
-        return {"vulnerability": run_profile(None)["vulnerability"], "error": "profile_unavailable"}
+        return {"vulnerability": run_profile(None)["vulnerability"], "error": "profile_unavailable", "area": None}
     error = None if profile else "profile_missing"
-    return {**run_profile(profile), "error": error}
+    return {**run_profile(profile), "error": error, "area": (profile or {}).get("area")}
 
 
 async def run_monitoring(*, db, run_id: str, profile_id: str, scenario: str, fault=()) -> CareStatusResult:
@@ -39,8 +39,7 @@ async def run_monitoring(*, db, run_id: str, profile_id: str, scenario: str, fau
         devices=iot["devices"],
         cctv=iot["cctv"],
         vulnerability=profile["vulnerability"],
-        # TODO: 병원 검색 지역. DB 프로필에 area가 없고 두나 님 MCP mock_data에만 있음 → 어디서 가져올지 합의 필요
-        area=None,
+        area=profile["area"],
         source=vital["source"] or "mock",
         errors=errors,
     )

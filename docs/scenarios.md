@@ -254,7 +254,7 @@ SCENARIOS = {
 | 해든 | `rules/risk.py` | 입력 키를 스키마 이름으로 (`vitals`→`vital`, `hr`→`heart_rate`, `env`→`indoor_environment` …) |
 | 해든 | `rules/risk.py` | 인덕션을 `induction_minutes`, `induction_temperature` 숫자로 읽고, 과열(≥250℃) 조건 추가 |
 | 해든 | `rules/risk.py` | `fall_event`·`signs` 입력과 `ELDER_NO_RESPONSE`, 스피커 확인(`speaker_check`) 제거 |
-| 해든·지혜 | `rules/risk.py` | 119 승인 대기 60초 초과 시 자동 연결(`on_timeout: "execute"`) 유지 여부 결정 (아래 참고) |
+| ~~해든·지혜~~ | ~~`rules/risk.py`~~ | ~~119 승인 대기 60초 초과 시 자동 연결 유지 여부~~ → **쓰지 않기로 결정 (10/12)**. `ENABLE_TIMEOUT_119 = False` |
 | 두나 | `mock_data.py` | 4-1의 데이터로 교체 |
 
-> **미정:** 해든님 코드에는 "119 승인 요청에 60초 동안 보호자 응답이 없으면 자동 연결"(`decided_by: "timeout"`)도 들어 있습니다. 이번 결정은 "바이탈 심각 시 자동 119"만이라 문서에는 넣지 않았습니다. 유지할지 팀에서 정해 주세요.
+> **결정 (10/12):** 승인 없이 119에 연결하는 경우는 **바이탈 매우 위험(`VITAL_SEVERE`)일 때 하나뿐**입니다. "119 승인 요청에 60초 동안 보호자 응답이 없으면 자동 연결"은 쓰지 않습니다 (`risk.py`의 `ENABLE_TIMEOUT_119 = False`). 시간이 지나도 119를 걸지 않고 보호자에게 다시 알림만 보냅니다.

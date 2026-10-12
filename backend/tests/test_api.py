@@ -28,3 +28,45 @@ def test_ready_returns_503_when_mcp_down(monkeypatch):
     monkeypatch.setattr(backend_app.mcp_client, "list_tools", fake_list_tools)
     response = TestClient(backend_app.app).get("/health/ready")
     assert response.status_code == 503
+
+
+def install_cctv(monkeypatch, behavior):
+    requested = []
+
+    async def fake_fetch(name):
+        requested.append(name)
+        return behavior(name)
+
+    monkeypatch.setattr(backend_app.mcp_client, "fetch_cctv_image", fake_fetch)
+    return requested
+
+
+def test_cctv_image_is_relayed_from_mcp(monkeypatch):
+    requested = install_cctv(monkeypatch, lambda name: (b"\x89PNG-fake", "image/png"))
+    response = TestClient(backend_app.app).get("/cctv/fall.png")
+    assert response.status_code == 200
+    assert response.content == b"\x89PNG-fake"
+    assert response.headers["content-type"] == "image/png"
+    assert requested == ["fall.png"]
+
+
+def test_cctv_image_not_found(monkeypatch):
+    def missing(name):
+        raise backend_app.mcp_client.CctvImageNotFound(name)
+    install_cctv(monkeypatch, missing)
+    assert TestClient(backend_app.app).get("/cctv/none.png").status_code == 404
+
+
+def test_cctv_image_returns_503_when_mcp_down(monkeypatch):
+    def down(name):
+        raise backend_app.mcp_client.McpConnectionError("MCP 연결 실패")
+    install_cctv(monkeypatch, down)
+    assert TestClient(backend_app.app).get("/cctv/fall.png").status_code == 503
+
+
+def test_cctv_rejects_non_image_or_path_names(monkeypatch):
+    requested = install_cctv(monkeypatch, lambda name: (b"x", "image/png"))
+    client = TestClient(backend_app.app)
+    for name in ["server.py", "..png", "%2e%2e%2fsecret.png"]:
+        assert client.get(f"/cctv/{name}").status_code == 404, name
+    assert requested == []           # MCP 서버까지 가지 않음

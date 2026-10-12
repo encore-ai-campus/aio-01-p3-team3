@@ -8,6 +8,8 @@
 #   켰을 때 동작은 monkeypatch로 따로 확인.
 # 2026-10-08 해든 (확정안과 다른 부분 정리): 119 바로 연결·워치 확인은 시연에서 꺼 둠. 이 파일은 extended_design으로 켜고 확인.
 # 2026-10-08 해든 (main 문서 개정판): docs/scenarios.md 기준(NEWS2, fall SpO2 96)으로 기대값을 바꿈. critical 119는 해든 결정으로 승인 요청 유지.
+# 2026-10-12 해든: README대로 critical(VITAL_SEVERE) 119 자동 연결, 에어컨 조치 값에 action 추가에 맞춰 기대값을 바꿈.
+# 2026-10-12 해든: 60초 무응답 자동 연결 설정(ENABLE_TIMEOUT_119)을 추가. 팀 의견으로 기본 켜짐, 껐을 때 동작은 monkeypatch로 확인.
 
 import json
 
@@ -40,7 +42,7 @@ def full(name, **extra):
 @pytest.mark.parametrize("desc, care_status, auto", [
     ("쓰러짐 + 무응답", case(cam("fallen", True), {"watch_response": "none"}), "ELDER_NO_RESPONSE"),
     ("누워 있음 + 무응답", case(cam("lying"), {"watch_response": "none"}), "ELDER_NO_RESPONSE"),
-    ("critical (바이탈 위험 3개) → 승인 요청 (해든 결정)", full("critical"), None),
+    ("critical (바이탈 위험 3개) → 119 자동 연결 (README)", full("critical"), "VITAL_SEVERE"),
     ("쓰러짐만 (응답 모름)", case(cam("fallen", True)), None),
     ("쓰러짐 + 워치 '도와주세요' 버튼", case(cam("fallen", True), {"watch_response": "help"}), None),
     ("README fall (바이탈 1~2점 변화)", full("fall"), None),
@@ -80,7 +82,18 @@ def test_auto_119_switch_off(monkeypatch):
 
 # ---------- 승인 대기 시간 초과 ----------
 
-def test_timeout_executes_119_and_reminds_devices():
+def test_timeout_only_reminds_when_switched_off(monkeypatch):
+    """ENABLE_TIMEOUT_119를 끄면 승인 대기 시간이 지나도 119는 다시 알림만."""
+    monkeypatch.setattr(risk, "ENABLE_TIMEOUT_119", False)
+    care = case(cam("fallen", True), vitals=NORMAL_VITALS)
+    r = evaluate(care, month=8)
+    t = after_guardian_timeout(r["actions"])
+    assert t["execute"] == [] and [a["type"] for a in t["remind"]] == ["call_119"]
+
+
+def test_timeout_executes_119_and_reminds_devices(monkeypatch):
+    # 60초 무응답 자동 연결은 시연에서 끔 (기화 10/12). 스위치를 켰을 때의 동작만 확인
+    monkeypatch.setattr(risk, "ENABLE_TIMEOUT_119", True)
     care = case(cam("fallen", True), vitals=NORMAL_VITALS)
     care["env"] = {"temp": 33}
     r = evaluate(care, month=8)
@@ -102,10 +115,14 @@ def test_info_only_notify_has_no_reminder():
 
 # ---------- 알림 문구 ----------
 
-def test_alert_messages():
+def test_alert_messages(monkeypatch):
+    monkeypatch.setattr(risk, "ENABLE_TIMEOUT_119", True)     # 켰을 때 문구 (시연 기본값은 꺼짐)
     r = evaluate(full("fall"), month=8)
     assert "60초 안에 응답이 없으면 119에 자동으로 연락합니다" in pending_guardian_message("위급", r["reason"], r["actions"])
     assert "60초" not in pending_guardian_message("주의", "인덕션", evaluate(full("induction"), month=8)["actions"])
+    monkeypatch.setattr(risk, "ENABLE_TIMEOUT_119", False)
+    r = evaluate(full("fall"), month=8)
+    assert "자동으로 연락" not in pending_guardian_message("위급", r["reason"], r["actions"])
     assert reminder_guardian_message("위급", 30).endswith("30초 뒤 119에 자동으로 연락합니다.")
     msg = emergency_alert_message("심박 위험 범위", "ELDER_NO_RESPONSE", "○○병원 응급실 (1.2km)")
     assert msg.startswith("[긴급] 어르신이 워치 확인에 응답하지 않아 119에 바로 연락했습니다")

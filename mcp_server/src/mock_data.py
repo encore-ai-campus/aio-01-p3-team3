@@ -43,6 +43,7 @@ MOCK_PROFILES: Final[dict[str, dict[str, object]]] = {
 }
 
 
+# [팀 합의] 해든 10/12: assets/cctv의 jpg가 지워지고 png 4장만 남아 cctv_image_path를 .png로 맞춤 (jpg 경로면 "이미지 파일 없음"으로 모든 CCTV가 판단 불가가 됐음).
 SCENARIOS: Final[dict[Scenario, dict[str, object]]] = {
     "normal": {
         "vital": {

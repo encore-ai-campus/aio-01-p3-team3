@@ -12,6 +12,7 @@
 # 2026-10-08 해든 (워치 버튼·2차 점검): 이름을 워치로 바꾸고, S19 열 안내(ELDER_CARE_TIP)·S15 글자 수 안내·거절 템플릿 판정 근거 테스트 추가.
 # 2026-10-08 해든 (확정안과 다른 부분 정리): 시연 설정에서 워치 확인을 꺼서 fall 조치가 확정안대로 3개(119·응급실·알림).
 # 2026-10-08 해든 (main 문서 개정판): docs/scenarios.md 기준(NEWS2, fall SpO2 96)으로 기대값을 바꿈.
+# 2026-10-12 해든 (README 9장 최종 맞춤): CCTV 약한 의심 = 경고(CCTV_SUSPECT_IS_CRITICAL False), 119 60초 무응답 자동 연결은 팀 의견으로 유지(ENABLE_TIMEOUT_119 True). 반대 설정은 monkeypatch로 확인.
 
 import json
 
@@ -243,7 +244,9 @@ def test_no_approval_action_cannot_say_approve():
 
 def test_prompt_marks_approval_per_action():
     p = emergency_prompt(emergency_ctx("fall"))
-    assert "1. 119 호출 [승인 필요, 60초 응답 없으면 자동 연결]" in p and "2. 가까운 병원 정보 안내 [승인 없음, 바로 실행]" in p
+    # 60초 무응답 자동 연결은 끔 (기화 10/12) → 119는 그냥 "승인 필요"
+    assert "1. 119 호출 [승인 필요]" in p and "2. 가까운 병원 정보 안내 [승인 없음, 바로 실행]" in p
+    assert "자동 연결" not in p
 
 
 @pytest.mark.parametrize("guardian, elder", [

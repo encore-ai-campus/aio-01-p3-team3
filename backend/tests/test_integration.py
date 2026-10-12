@@ -9,10 +9,12 @@
 # 2026-10-08 해든 (CCTV 캡처): fall 승인 알림에 캡처 경로·"CCTV 캡처를 보고 판단하세요", CCTV 판단 불가면 원본 확인 요청 테스트.
 # 2026-10-08 해든 (시연 시나리오 확정안): MOCK을 확정안 4장 값(기기 구조 형식, fall 바이탈)으로, 프로필을 확정안 3장
 #   profile-01~03과 5장 조합으로 바꿈. critical은 119 바로 연결이 아니라 승인 요청 (확정안 7장 5번 장면).
+# 2026-10-12 해든: README대로 critical(VITAL_SEVERE) 119 자동 연결, 에어컨 조치 값에 action 추가에 맞춰 기대값을 바꿈.
 #
 # [팀 합의] 지혜 님: 아래 care_run / care_approve 순서대로 해든 함수를 부르면 됩니다. 응답 키는 README 6장 응답 1·2와 같음.
 # [팀 합의] 두나 님: FakeTools의 함수 이름·인자·반환 형식이 실제 MCP 도구와 같아야 합니다. 다르면 알려 주세요.
 # 2026-10-08 해든 (main 문서 개정판): 기대값을 docs/scenarios.md로. critical 119는 해든 결정으로 승인 요청 유지, 자동 연결 알림에도 캡처 안내.
+# 2026-10-12 해든 (README 9장 최종 맞춤): CCTV 약한 의심 = 경고(CCTV_SUSPECT_IS_CRITICAL False), 119 60초 무응답 자동 연결은 팀 의견으로 유지(ENABLE_TIMEOUT_119 True). 반대 설정은 monkeypatch로 확인.
 
 import pytest
 
@@ -174,7 +176,7 @@ def care_approve(task_id, approved: bool | None):
     ("heat", "pending_approval", "경고"),        # profile-02 (중)
     ("induction", "pending_approval", "주의"),   # profile-03 (하)
     ("fall", "pending_approval", "위급"),
-    ("critical", "pending_approval", "위급"),    # 해든 결정: 문서 2-4장 자동 연결 대신 119 승인 요청
+    ("critical", "done", "위급"),               # README: 바이탈 매우 위험 → 119 자동 연결
 ])
 def test_care_run_readme_scenarios(scenario, status, level):
     r = care_run(FakeTools(scenario), f"t-{scenario}")
@@ -186,7 +188,7 @@ def test_heat_approve_runs_aircon_with_readme_args():
     care_run(tools, "t1")
     r = care_approve("t1", True)
     assert r["status"] == "done" and r["elder_message"].startswith("어르신")
-    assert ("control_device", "aircon", "on", {"mode": "cool", "target": 26}) in tools.log
+    assert ("control_device", "aircon", "cool", {"mode": "cool", "target": 26}) in tools.log
 
 
 def test_induction_reject_tells_elder_and_guardian():
@@ -197,7 +199,18 @@ def test_induction_reject_tells_elder_and_guardian():
     assert not any(x[0] == "control_device" for x in tools.log)
 
 
-def test_fall_timeout_calls_119():
+def test_fall_timeout_only_reminds_when_switched_off(monkeypatch):
+    """ENABLE_TIMEOUT_119를 끄면 시간이 지나도 119를 걸지 않고 계속 대기 (해든 10/12)."""
+    monkeypatch.setattr(risk, "ENABLE_TIMEOUT_119", False)
+    tools = FakeTools("fall")
+    care_run(tools, "t3b")
+    r = care_approve("t3b", None)
+    assert r["status"] == "pending_approval" and not any(x[0] == "call_119" for x in tools.log)
+
+
+def test_fall_timeout_calls_119(monkeypatch):
+    """ENABLE_TIMEOUT_119를 켰을 때만 60초 무응답 자동 연결 (시연 기본값은 꺼짐, 기화 10/12)."""
+    monkeypatch.setattr(risk, "ENABLE_TIMEOUT_119", True)
     tools = FakeTools("fall")
     care_run(tools, "t3")
     r = care_approve("t3", None)
@@ -242,11 +255,11 @@ def test_fall_approval_alert_has_cctv_capture():
 
 
 def test_vision_failure_asks_to_check_original_capture():
-    """docs/scenarios.md 7장 8번: 영상 판단 불가 → 바이탈만으로 위급 + 원본 캡처 확인 요청 (119는 승인 요청)."""
-    tools = FakeTools("critical")
+    """docs/scenarios.md 7장 8번: 영상 판단 불가 → 바이탈만으로 위급 + 원본 캡처 확인 요청 (fall은 119 승인 요청)."""
+    tools = FakeTools("fall")
     tools.analyze_cctv = lambda path: {"image_path": path, "available": False, "description": "영상 판단 불가"}
     r = care_run(tools, "t8")
-    assert (r["status"], r["risk_level"]) == ("pending_approval", "위급")
+    assert r["status"] == "pending_approval"
     assert "원본 캡처를 직접 확인하세요" in tools.log[-1][1]
     PENDING.pop("t8")
 

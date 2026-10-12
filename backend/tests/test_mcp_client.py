@@ -4,6 +4,7 @@ import asyncio
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
 
+import httpx
 import pytest
 
 from src import mcp_client
@@ -50,6 +51,43 @@ def test_tool_error_raises_tool_error(monkeypatch):
     install_session(monkeypatch, fake_result(texts=["지원하지 않는 profile_id입니다: x"], is_error=True))
     with pytest.raises(mcp_client.McpToolError, match="get_vitals"):
         asyncio.run(mcp_client.call_tool("get_vitals", {"profile_id": "x", "scenario": "normal"}))
+
+
+def install_http(monkeypatch, status_code, content=b"", content_type="image/png"):
+    requested = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested.append(str(request.url))
+        return httpx.Response(status_code, content=content, headers={"content-type": content_type})
+
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(mcp_client.httpx, "AsyncClient",
+                        lambda **kwargs: real_client(transport=httpx.MockTransport(handler), **kwargs))
+    return requested
+
+
+def test_cctv_image_comes_from_server_root_not_mcp_path(monkeypatch):
+    requested = install_http(monkeypatch, 200, b"\x89PNG-fake")
+    content, media_type = asyncio.run(mcp_client.fetch_cctv_image("fall.png", base_url="http://mcp:8010"))
+    assert content == b"\x89PNG-fake" and media_type == "image/png"
+    assert requested == ["http://mcp:8010/cctv/fall.png"]
+
+
+def test_cctv_base_url_drops_mcp_suffix():
+    assert mcp_client.MCP_URL.endswith("/mcp")
+    assert mcp_client.MCP_BASE_URL == mcp_client.MCP_URL[: -len("/mcp")]
+
+
+def test_cctv_image_404_raises_not_found(monkeypatch):
+    install_http(monkeypatch, 404, b'{"error": "CCTV_IMAGE_NOT_FOUND"}', "application/json")
+    with pytest.raises(mcp_client.CctvImageNotFound):
+        asyncio.run(mcp_client.fetch_cctv_image("none.png"))
+
+
+def test_cctv_image_server_error_is_connection_error(monkeypatch):
+    install_http(monkeypatch, 500)
+    with pytest.raises(ConnectionError):
+        asyncio.run(mcp_client.fetch_cctv_image("fall.png"))
 
 
 def test_unreachable_server_raises_connection_error():

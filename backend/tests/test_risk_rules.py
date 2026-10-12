@@ -13,6 +13,8 @@
 #   경계값을 확정안 2장 위험 범위·실내 30℃/16℃로 바꾸고, 확정안 5장·8장 기대값 테스트(test_demo_*)를 추가.
 # 2026-10-08 해든 (main 문서 개정판): docs/scenarios.md 2·5·8장 기준(NEWS2, 실내 28/20·극한 31/18)으로 기대값을 바꿈. critical 119는 해든 결정으로 승인 요청.
 # 2026-10-08 해든 (확정안과 다른 부분 정리): 시연 설정에서 워치 확인을 꺼서 fall 조치가 확정안대로 3개(119·응급실·알림).
+# 2026-10-12 해든: README대로 critical(VITAL_SEVERE) 119 자동 연결, 에어컨 조치 값에 action 추가에 맞춰 기대값을 바꿈.
+# 2026-10-12 해든 (README 9장 최종 맞춤): CCTV 약한 의심 = 경고(CCTV_SUSPECT_IS_CRITICAL False), 119 60초 무응답 자동 연결은 팀 의견으로 유지(ENABLE_TIMEOUT_119 True). 반대 설정은 monkeypatch로 확인.
 
 import pytest
 
@@ -92,10 +94,10 @@ def test_demo_expected_levels(name, profile, cctv_ok, level):
     ("heat", "profile-02", ["control_device", "notify_guardian"], None),
     ("induction", "profile-03", ["control_device", "notify_guardian"], None),
     ("fall", "profile-01", ["call_119", "hospital_info", "notify_guardian"], None),
-    ("critical", "profile-01", ["call_119", "hospital_info", "notify_guardian"], None),   # 해든 결정: 문서와 달리 승인 요청
+    ("critical", "profile-01", ["call_119", "hospital_info", "notify_guardian"], "VITAL_SEVERE"),   # README: 승인 없이 119
 ])
 def test_demo_expected_actions(name, profile, actions, auto):
-    """docs/scenarios.md 5장 조치안. 119·기기 제어는 모두 승인 필요 (critical 자동 연결은 해든 결정으로 끔)."""
+    """docs/scenarios.md 5장 조치안. 기기 제어와 fall 119는 승인 필요, critical 119만 자동 연결 (README VITAL_SEVERE)."""
     r = evaluate(care(name, vulnerability(PROFILES[profile])), month=8)
     assert types(r) == actions
     assert r["auto_119"] == auto
@@ -107,11 +109,11 @@ def test_demo_expected_actions(name, profile, actions, auto):
 
 
 def test_demo_section8_extra_cases():
-    """docs/scenarios.md 8장: 과열만으로 방치, CCTV 실패·바이탈 캐시. 119 자동 연결은 해든 결정으로 끔."""
+    """docs/scenarios.md 8장: 과열만으로 방치, CCTV 실패여도 바이탈로 자동 119, 바이탈 캐시면 자동 연결 안 함."""
     dev = {"aircon": {"state": "off"}, "induction": {"state": "on", "minutes": 30, "temperature": 300}}
     assert evaluate(care("induction", "하", devices=dev), month=8)["risk_level"] == "주의"
     no_cctv = evaluate(care("critical", "상", cctv={"available": False}), month=8)
-    assert (no_cctv["risk_level"], no_cctv["auto_119"]) == ("위급", None)
+    assert (no_cctv["risk_level"], no_cctv["auto_119"]) == ("위급", "VITAL_SEVERE")
     cached = evaluate(care("critical", "상", vitals={**SCENARIOS["critical"]["vitals"], "source": "cache"}), month=8)
     assert (cached["risk_level"], cached["auto_119"]) == ("위급", None)
 
@@ -212,13 +214,13 @@ def test_induction_overheat_without_long_time():
 def test_heat_actions_aircon_cool_to_comfort_top():
     r = evaluate(care("heat"), month=9)
     assert types(r) == ["control_device", "notify_guardian"]
-    assert r["actions"][0]["value"] == {"device": "aircon", "mode": "cool", "target": 26}
+    assert r["actions"][0]["value"] == {"device": "aircon", "action": "cool", "mode": "cool", "target": 26}
     assert r["actions"][0]["needs_approval"] is True
 
 
 def test_cold_actions_aircon_heat_to_comfort_bottom():
     r = evaluate(care("normal", env={"temp": 15}), month=1)
-    assert r["actions"][0]["value"] == {"device": "aircon", "mode": "heat", "target": 20}
+    assert r["actions"][0]["value"] == {"device": "aircon", "action": "heat", "mode": "heat", "target": 20}
 
 
 def test_induction_actions_turn_off():
@@ -284,19 +286,31 @@ def test_heat_reason_has_body_temp_and_indoor():
 
 
 def test_demo_settings_follow_final_plan():
-    """docs/scenarios.md: 워치 확인은 끔(fall_event 제외), CCTV 의심은 위급. 119 자동 연결은 해든 결정으로 끔."""
+    """README 9장: 워치 확인은 끔, CCTV 약한 의심은 경고. 승인 없는 119는 바이탈 매우 위험일 때만 (60초 무응답 자동 연결은 끔, 기화 10/12)."""
     import src.rules.risk as risk
-    assert risk.ENABLE_WATCH_CHECK is False and risk.CCTV_SUSPECT_IS_CRITICAL is True
-    assert risk.ENABLE_AUTO_119 is False and risk.VITAL_DANGER_FROM_NEWS2 is True and risk.ENABLE_ENV_EXTREME is True
+    assert risk.ENABLE_WATCH_CHECK is False and risk.CCTV_SUSPECT_IS_CRITICAL is False and risk.ENABLE_TIMEOUT_119 is False
+    assert risk.ENABLE_AUTO_119 is True and risk.ENABLE_AUTO_119_VITAL is True and risk.VITAL_DANGER_FROM_NEWS2 is True and risk.ENABLE_ENV_EXTREME is True
 
 
 @pytest.mark.parametrize("cctv", [
     {**CCTV_FALL, "confidence": "low"},                                                     # 흐린 사진
     {"person_visible": True, "posture": "sitting", "fall_suspected": True, "description": "바닥에 앉아 계심"},  # 바닥에 주저앉음
 ])
-def test_cctv_suspicion_is_critical_with_capture(cctv):
-    """확정안: CCTV 쓰러짐 의심 → 위급. 대신 보호자가 캡처를 보고 119를 승인."""
-    r = evaluate(care("normal", "하", cctv={**cctv, "image_path": "assets/cctv/x.jpg"}), month=8)
+def test_cctv_weak_suspicion_is_warning_with_capture(cctv):
+    """README 9장 (해든 10/12): 흐린 사진·자세와 플래그 불일치는 낙상 의심(FALL_SUSPECTED) = 경고. 캡처는 그대로 붙임."""
+    r = evaluate(care("normal", "하", cctv={**cctv, "image_path": "assets/cctv/x.png"}), month=8)
+    assert r["risk_level"] == "경고" and r["fall_state"] == "suspected" and types(r) == ["notify_guardian"]
+    assert r["actions"][-1]["value"]["cctv_check"] == "fall" and r["actions"][-1]["value"]["cctv_image"] == "assets/cctv/x.png"
+
+
+@pytest.mark.parametrize("cctv", [
+    {**CCTV_FALL, "confidence": "low"},
+    {"person_visible": True, "posture": "sitting", "fall_suspected": True, "description": "바닥에 앉아 계심"},
+])
+def test_cctv_suspicion_is_critical_when_switched_on(cctv, monkeypatch):
+    """예전 확정안 설정(CCTV_SUSPECT_IS_CRITICAL = True)을 켜면 의심도 위급 + 119 승인 요청."""
+    import src.rules.risk as risk
+    monkeypatch.setattr(risk, "CCTV_SUSPECT_IS_CRITICAL", True)
+    r = evaluate(care("normal", "하", cctv={**cctv, "image_path": "assets/cctv/x.png"}), month=8)
     assert r["risk_level"] == "위급" and types(r) == ["call_119", "hospital_info", "notify_guardian"]
     assert r["actions"][0]["needs_approval"] is True
-    assert r["actions"][-1]["value"]["cctv_check"] == "fall"

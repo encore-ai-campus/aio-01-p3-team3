@@ -65,6 +65,7 @@ def test_cctv_route_serves_every_scenario_image() -> None:
         assert Path(response.path) == server.CCTV_ASSET_DIR / name
 
 
+# 해든 10/12: CCTV 이미지가 png로 바뀌어 존재하는 이미지 이름으로 확인.
 def test_cctv_route_reports_missing_allowed_image(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(server, "CCTV_ASSET_DIR", tmp_path)
     request = SimpleNamespace(path_params={"name": "fall.png"})

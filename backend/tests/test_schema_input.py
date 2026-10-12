@@ -5,11 +5,12 @@
 #   확정안 형식(vitals.hr, env, 구조 기기)이 달라 rules.risk.normalize_care_status()를 넣고 같은 결과인지 확인.
 # 2026-10-08 해든 (두나 님 CCTV 연결): status·숫자 confidence 테스트 추가.
 # 2026-10-08 해든 (main 문서 개정판): 스키마에 critical·induction_temperature가 들어가 그대로 씀, 기대값을 docs/scenarios.md 8장으로.
+# 2026-10-12 해든 (CCTV 출력 계약, 선택지 B): analyzed인데 필수 4항목이 빠지면 영상 판단 불가로 보는지 테스트 추가.
 
 import pytest
 
 from src.agents.emergency import run_emergency
-from src.rules.risk import evaluate, normalize_care_status
+from src.rules.risk import cctv_contract_errors, evaluate, normalize_care_status
 from src.schemas import CareStatusResult
 from tests.test_risk_rules import PROFILES, SCENARIOS, types
 from src.agents.profile import vulnerability
@@ -94,3 +95,38 @@ def test_cctv_status_and_numeric_confidence_from_analyzer():
     assert off["cctv"]["available"] is False
     low = normalize_care_status({"cctv": {"status": "analyzed", "available": True, "posture": "fallen", "confidence": 0.4}})
     assert low["cctv"]["confidence"] == "low"
+
+
+# ---------- CCTV 출력 계약 (해든 10/12, 선택지 B) ----------
+
+FALL_CCTV = {"image_path": "assets/cctv/fall.jpg", "status": "analyzed", "person_visible": True,
+             "posture": "fallen", "fall_suspected": True, "confidence": 0.9, "description": "바닥에 누워 계신 것으로 보입니다."}
+
+
+def test_contract_passes_full_analyzed_and_failed_without_fields():
+    assert cctv_contract_errors(FALL_CCTV) == []
+    assert cctv_contract_errors({"status": "failed", "image_path": "assets/cctv/fall.jpg"}) == []
+    assert cctv_contract_errors({"status": "unavailable"}) == []
+
+
+@pytest.mark.parametrize("missing", ["person_visible", "posture", "fall_suspected", "description"])
+def test_analyzed_without_required_field_becomes_unjudgeable(missing):
+    """분석 성공이라면서 필수 항목이 빠지면 믿지 않고 영상 판단 불가 → 원본 캡처 확인 요청, 바이탈 중심 판정."""
+    cctv = {k: v for k, v in FALL_CCTV.items() if k != missing}
+    if missing == "description":
+        cctv["summary"] = None
+    assert cctv_contract_errors(cctv)
+    data = to_schema("normal", "하")
+    data["cctv"] = cctv
+    cs = normalize_care_status(data)
+    assert cs["cctv"]["available"] is False and cs["cctv"]["status"] == "failed"
+    assert cs["cctv"]["image_path"] == "assets/cctv/fall.jpg"          # 원본 캡처 경로는 남김
+    r = evaluate(data, month=8)
+    assert "CCTV_UNAVAILABLE" in r["reason_codes"] and r["fall_state"] != "confirmed"
+
+
+def test_analyzed_with_summary_only_still_passes():
+    """두나 님 도구는 summary도 같이 줌. description이 비어 있어도 summary로 채운 뒤 검사한다."""
+    data = to_schema("normal", "하")
+    data["cctv"] = {**FALL_CCTV, "description": None, "summary": "바닥에 누워 계신 것으로 보입니다."}
+    assert evaluate(data, month=8)["fall_state"] == "confirmed"
