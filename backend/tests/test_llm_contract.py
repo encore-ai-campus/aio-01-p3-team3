@@ -13,6 +13,7 @@
 # 2026-10-08 해든 (확정안과 다른 부분 정리): 시연 설정에서 워치 확인을 꺼서 fall 조치가 확정안대로 3개(119·응급실·알림).
 # 2026-10-08 해든 (main 문서 개정판): docs/scenarios.md 기준(NEWS2, fall SpO2 96)으로 기대값을 바꿈.
 # 2026-10-12 해든 (README 9장 최종 맞춤): CCTV 약한 의심 = 경고(CCTV_SUSPECT_IS_CRITICAL False), 119 60초 무응답 자동 연결은 팀 의견으로 유지(ENABLE_TIMEOUT_119 True). 반대 설정은 monkeypatch로 확인.
+# 2026-10-12 해든 (주석 정리): 위 줄의 "60초 무응답 자동 연결 유지"는 최종 결정(기화, #27)으로 뒤집힘. 기본값 False, 켠 경우만 monkeypatch로 확인.
 
 import json
 
