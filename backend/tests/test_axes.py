@@ -8,6 +8,7 @@
 #   4. 환경 위험: 실내 고온·저온(+체온·인덕션) + 에어컨/보일러 제어 → environment
 # 2026-10-08 해든 (확정안 판정 순서): 위험 범위 안쪽 작은 바이탈 변화만으로는 정상 (VITAL_CHANGE_ALONE_RAISES = False).
 # 2026-10-08 해든 (main 문서 개정판): docs/scenarios.md 2-3장대로 변화(1~2점)도 그 축 주의, 위험 범위는 NEWS2 3점.
+# 2026-10-12 해든: README대로 critical(VITAL_SEVERE) 119 자동 연결, 에어컨 조치 값에 action 추가에 맞춰 기대값을 바꿈.
 
 import pytest
 
@@ -99,7 +100,7 @@ def test_body_temp_danger_gets_hospital():
 def test_heating_device_can_be_boiler(monkeypatch):
     monkeypatch.setattr(risk, "HEATING_DEVICE", "boiler")
     r = evaluate(care("normal", env={"temp": 15}), month=1)
-    assert r["actions"][0]["value"] == {"device": "boiler", "mode": "heat", "target": 20}
+    assert r["actions"][0]["value"] == {"device": "boiler", "action": "heat", "mode": "heat", "target": 20}
     hot = evaluate(care("normal", env={"temp": 33}), month=8)
     assert hot["actions"][0]["value"]["device"] == "aircon"      # 냉방은 그대로 에어컨
 

@@ -8,6 +8,7 @@
 #   켰을 때 동작은 monkeypatch로 따로 확인.
 # 2026-10-08 해든 (확정안과 다른 부분 정리): 119 바로 연결·워치 확인은 시연에서 꺼 둠. 이 파일은 extended_design으로 켜고 확인.
 # 2026-10-08 해든 (main 문서 개정판): docs/scenarios.md 기준(NEWS2, fall SpO2 96)으로 기대값을 바꿈. critical 119는 해든 결정으로 승인 요청 유지.
+# 2026-10-12 해든: README대로 critical(VITAL_SEVERE) 119 자동 연결, 에어컨 조치 값에 action 추가에 맞춰 기대값을 바꿈.
 
 import json
 
@@ -40,7 +41,7 @@ def full(name, **extra):
 @pytest.mark.parametrize("desc, care_status, auto", [
     ("쓰러짐 + 무응답", case(cam("fallen", True), {"watch_response": "none"}), "ELDER_NO_RESPONSE"),
     ("누워 있음 + 무응답", case(cam("lying"), {"watch_response": "none"}), "ELDER_NO_RESPONSE"),
-    ("critical (바이탈 위험 3개) → 승인 요청 (해든 결정)", full("critical"), None),
+    ("critical (바이탈 위험 3개) → 119 자동 연결 (README)", full("critical"), "VITAL_SEVERE"),
     ("쓰러짐만 (응답 모름)", case(cam("fallen", True)), None),
     ("쓰러짐 + 워치 '도와주세요' 버튼", case(cam("fallen", True), {"watch_response": "help"}), None),
     ("README fall (바이탈 1~2점 변화)", full("fall"), None),

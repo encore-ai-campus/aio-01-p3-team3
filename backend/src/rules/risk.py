@@ -49,6 +49,11 @@
 #   - cctv.status(analyzed/unavailable/failed) → available, 숫자 confidence → "high"/"low", fall_event.voice_response → watch_response
 #   - 확정안 형식(vitals/env/구조 기기)으로 오면 그대로 둠. evaluate()와 Emergency Agent 입구에서 한 번 부름.
 # 2026-10-08 해든 (두나 님 CCTV 연결): cctv.status가 analyzed가 아니면 항상 판단 불가로 봄. 숫자 confidence는 available 키가 있어도 high/low로 바꿈.
+# 2026-10-12 해든 (README 기준으로 119 자동 연결): ENABLE_AUTO_119·ENABLE_AUTO_119_VITAL을 True로 바꿈.
+#   critical처럼 바이탈 위험 범위 2개 이상 + 점수 합 7점 이상 + 최신 측정값이면 승인 없이 119 (auto_119 "VITAL_SEVERE").
+#   그 밖의 119(낙상 등)는 그대로 보호자 승인 요청.
+# 2026-10-12 해든 (에어컨 제어 오류): 에어컨 조치 값에 action(cool/heat)을 넣음. 두나 님 control_device(device, action)는
+#   action이 필수라 mode만 있으면 실제 MCP 호출이 실패했음 (heat 시나리오). mode·target은 화면·문구용으로 남김.
 # 2026-10-08 해든 (main 문서 docs/scenarios.md 개정판에 맞춤): 팀 문서가 "판정은 risk.py를 따른다"로 바뀌며 NEWS2 기준을 적음.
 #   - 위험 범위 = NEWS2 3점 (VITAL_DANGER_FROM_NEWS2 = True, 예전 확정안 범위 VITAL_DANGER는 남겨 둠)
 #   - 실내 이상 28℃ 초과 / 20℃ 미만, 실내 극한 31℃ 초과 / 18℃ 미만 → 경고 (ENABLE_ENV_EXTREME = True)
@@ -113,9 +118,10 @@ UPRIGHT = {"standing", "sitting"}
 # [팀 합의] 기화 님·지혜 님: README 핵심 원칙 ①("119는 보호자 승인 후에만")에 예외를 둠. 합의 전이면 False로 두면 예전과 같음.
 # 해든 10/8: 확정안("119는 보호자 승인 후")에 맞춰 끔. 승인 대기 60초 뒤 자동 연결(on_timeout)은 그대로.
 # 해든 10/8 오후: docs/scenarios.md 2-4장은 VITAL_SEVERE 자동 연결이지만, 해든 결정으로 119는 모두 보호자 승인 (critical도 승인 요청).
-ENABLE_AUTO_119 = False
-# 바이탈만으로 바로 연결(VITAL_SEVERE). 확정안 critical 시나리오는 "119 호출 승인" 장면이라 끔. 워치 무응답 바로 연결은 그대로.
-ENABLE_AUTO_119_VITAL = False
+# 해든 10/12: README·docs/scenarios.md대로 다시 켬. critical(VITAL_SEVERE)은 승인 없이 119 자동 연결.
+ENABLE_AUTO_119 = True
+# 바이탈만으로 바로 연결(VITAL_SEVERE). 해든 10/12: README 응답 3·시연 5·8번에 맞춰 켬. 워치 무응답 바로 연결은 워치 확인이 꺼져 있어 동작 안 함.
+ENABLE_AUTO_119_VITAL = True
 # 바이탈 4항목 점수 합. NEWS2 원문은 7항목 합 7점 이상이면 "긴급 대응" (출처 확인 필요: RCP NEWS2 2017).
 #   여기는 4항목만 있어서 실제보다 낮게 나옴 → 7점이면 꽤 심한 상태.
 VITAL_SEVERE_SCORE = 7
@@ -539,7 +545,7 @@ def select_actions(causes: list[str], level: str, month: int, indoor: str = "nor
         cold = indoor.endswith("cold")
         device = HEATING_DEVICE if cold else "aircon"
         actions.append({"type": "control_device", "needs_approval": True, "on_timeout": "remind",
-                        "value": {"device": device, "mode": "heat" if cold else "cool",
+                        "value": {"device": device, "action": "heat" if cold else "cool", "mode": "heat" if cold else "cool",
                                   "target": low if cold else high}})
     if "INDUCTION_UNATTENDED" in causes:
         actions.append({"type": "control_device", "needs_approval": True, "on_timeout": "remind",
