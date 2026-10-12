@@ -28,6 +28,11 @@ class Database:
         from src.db.migrations import migrate_vital_readings
         with self.connect() as db:
             migrate_vital_readings(db)
+            db.execute('BEGIN IMMEDIATE')
+            cols = {r['name'] for r in db.execute('PRAGMA table_info(profiles)')}
+            if cols and 'area' not in cols:
+                db.execute('ALTER TABLE profiles ADD COLUMN area TEXT')
+            db.commit()
             db.executescript(Path(__file__).with_name('schema.sql').read_text(encoding='utf-8'))
 
     @contextmanager
@@ -73,14 +78,14 @@ class Database:
     def seed_profiles(self, profiles, *, overwrite=False):
         with self.connect() as db:
             for profile in profiles:
-                query = '''INSERT INTO profiles VALUES (?,?,?,?,?)
+                query = '''INSERT INTO profiles (profile_id,age,lives_alone,has_condition,mobility_limited,area) VALUES (?,?,?,?,?,?)
                     ON CONFLICT(profile_id) DO UPDATE SET age=excluded.age,
                     lives_alone=excluded.lives_alone, has_condition=excluded.has_condition,
-                    mobility_limited=excluded.mobility_limited''' if overwrite else (
-                    'INSERT OR IGNORE INTO profiles VALUES (?,?,?,?,?)')
+                    mobility_limited=excluded.mobility_limited, area=excluded.area''' if overwrite else (
+                    'INSERT OR IGNORE INTO profiles (profile_id,age,lives_alone,has_condition,mobility_limited,area) VALUES (?,?,?,?,?,?)')
                 db.execute(query,
                     (profile['profile_id'], profile['age'], int(profile['lives_alone']),
-                     int(profile['has_condition']), int(profile['mobility_limited'])))
+                     int(profile['has_condition']), int(profile['mobility_limited']), profile.get('area')))
 
     def get_profile(self, profile_id):
         with self.connect() as db:

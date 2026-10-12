@@ -1,5 +1,14 @@
 # 상옥 첫 개발 묶음 — 연결 안내
 
+## 2026-10-12 프로필 지역 연결
+
+profiles.area는 선택 TEXT 컬럼입니다. 기존 DB 초기화 시 컬럼이 없으면 추가하고,
+seed_profiles는 알려진 가상 프로필의 NULL/공백 지역만 보충합니다. 기존 지역과
+다른 프로필 정보는 기본 시드에서 보존합니다. 지역은 MCP Mock과 동일하게
+profile-01 서울시 강남구, profile-02 서울시 송파구, profile-03 서울시 서초구입니다.
+monitoring은 기존 프로필 조회 결과에서 area를 CareStatusResult에 전달합니다.
+프로필 누락·조회 실패 시 area=None, 취약도/Guard의 기존 처리 방식은 유지합니다.
+
 ## 2026-10-12 부분 바이탈 저장 보완
 
 수집 저장은 heart_rate/measured_at 필수, systolic_bp/diastolic_bp/temperature_c/spo2는
