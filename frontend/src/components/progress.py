@@ -36,22 +36,20 @@ def latest_progress(run_response: Mapping | None, approval_result: Mapping | Non
 
 
 def render_progress(run_response: Mapping | None, approval_result: Mapping | None = None) -> None:
+    # [팀 합의] 10/12 해든: 수언 님 시안의 "처리 과정" 한 줄 모양으로 바꿈. 단계 계산은 그대로.
     steps, status = latest_progress(run_response, approval_result)
     color, label = STATUS_STYLE.get(str(status), ("#1a73e8", ""))
     if not steps:          # 아직 실행 전: 전체 흐름을 회색으로 보여 준다
         steps, color, label = DEFAULT_STEPS, None, "상태 확인 전"
 
-    chips = []
+    parts = []
     for index, step in enumerate(steps):
         current = color is not None and index == len(steps) - 1
-        style = (f"background:{color};color:#fff;font-weight:600;" if current
-                 else "background:#f1f3f4;color:#3c4043;")
-        chips.append(f'<span style="{style}padding:4px 10px;border-radius:14px;white-space:nowrap;">'
-                     f"{escape(step)}</span>")
-    arrow = '<span style="color:#9aa0a6;margin:0 4px;">→</span>'
+        style = f' style="color:{color};"' if current else ""
+        parts.append(f'<span class="step{" now" if current else ""}"{style}>{escape(step)}</span>')
+    arrow = '<span class="arrow">→</span>'
     st.markdown(
-        f'<div style="display:flex;flex-wrap:wrap;align-items:center;gap:4px 0;margin:4px 0 2px;">'
-        f'<span style="color:#5f6368;margin-right:8px;">진행</span>{arrow.join(chips)}</div>',
+        f'<div class="ok-progress"><span class="dot" style="background:{color or "#bdb7ad"};"></span>'
+        f'<span class="lead">처리 과정</span>{arrow.join(parts)}<span class="state">{escape(label)}</span></div>',
         unsafe_allow_html=True,
     )
-    st.markdown(f'<div class="care-progress-label">{escape(label)}</div>', unsafe_allow_html=True)

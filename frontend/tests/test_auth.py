@@ -80,7 +80,7 @@ def test_guardian_sees_only_own_elder_and_runs_with_that_profile(monkeypatch):
     monkeypatch.setattr(approval, "request_care_run", fake_run)
     app = log_in_as(app_with_accounts(monkeypatch), "childB", "pw-b")
     assert not app.exception
-    assert any("어르신 B" in t.value for t in app.title)
+    assert any("어르신 B" in m.value for m in app.markdown)   # 어르신 배너 (10/12 해든: 제목 → 배너)
     assert not any(s.label == "어르신" for s in app.selectbox)        # 어르신 선택 없음
     next(b for b in app.button if b.label == "상태 확인하기").click().run()
     assert submitted == ["profile-02"]
