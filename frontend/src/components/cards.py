@@ -11,6 +11,7 @@ from collections.abc import Mapping
 from datetime import datetime
 
 import streamlit as st
+from src.api_client import BackendAPIError, fetch_cctv_image
 
 SOURCE_LABELS = {
     "live": "🟢 실시간 측정값",
@@ -91,12 +92,27 @@ def render_home_card(care_status: Mapping) -> None:
             st.warning("기기 상태를 확인할 수 없습니다.")
 
 
-def render_status_cards(run_response: Mapping | None) -> None:
+def render_status_cards(run_response: Mapping | None, backend_url: str | None = None) -> None:
     care_status = run_response.get("care_status") if isinstance(run_response, Mapping) else None
     if not isinstance(care_status, Mapping):
+        st.markdown('<div class="care-empty">아직 측정 결과가 없습니다. 왼쪽에서 시나리오를 선택하고 ‘상태 확인하기’를 눌러주세요.</div>', unsafe_allow_html=True)
         return
-    vital_column, home_column = st.columns(2)
+    vital_column, home_column, cctv_column = st.columns(3)
     with vital_column:
         render_vital_card(care_status)
     with home_column:
         render_home_card(care_status)
+    with cctv_column:
+        with st.container(border=True):
+            st.markdown('**📷 CCTV 확인**')
+            cctv = care_status.get('cctv') or {}
+            path = cctv.get('image_path')
+            if backend_url and path:
+                try:
+                    picture = fetch_cctv_image(backend_url, str(path))
+                except (BackendAPIError, ValueError):
+                    st.warning('캡처를 불러오지 못했습니다.')
+                else:
+                    st.image(picture, caption='보호자 확인용 캡처', use_container_width=True)
+            st.write(cctv.get('description') or cctv.get('summary') or '영상 판단 불가')
+            st.caption({'analyzed':'분석 완료','unavailable':'판단 불가','failed':'분석 실패'}.get(cctv.get('status'),'확인 전'))

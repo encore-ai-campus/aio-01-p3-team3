@@ -127,9 +127,6 @@ def _render_actions(emergency: Mapping[str, object]) -> None:
                 f"**{index}. {TOOL_LABELS.get(tool, tool)}** · {approval_text}"
             )
             st.write(description)
-            arguments = action.get("arguments")
-            if isinstance(arguments, dict) and arguments:
-                st.caption(f"실행 인자: {arguments}")
 
 
 def _cctv_values(
@@ -326,7 +323,7 @@ def render_approval_panel(
         if emergency_mapping:
             _render_risk(emergency_mapping)
             _render_actions(emergency_mapping)
-        _render_cctv(care_mapping, emergency_mapping, backend_url)
+        # CCTV is shown in the dashboard status card.
 
         if run_response.get("decided_by") == "auto":
             st.error(
@@ -363,7 +360,7 @@ def render_approval_panel(
     else:
         st.warning("위험·조치 정보를 불러오지 못했습니다.")
 
-    _render_cctv(care_mapping, emergency_mapping, backend_url)
+    # CCTV is shown in the dashboard status card.
 
     previous_result = st.session_state.get("approval_result")
     if isinstance(previous_result, dict):

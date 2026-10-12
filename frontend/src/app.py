@@ -24,6 +24,8 @@ from src.components.logs import render_autohealing_logs  # noqa: E402
 from src.components.progress import render_progress  # noqa: E402
 
 st.set_page_config(page_title="어르신 실시간 케어", page_icon="💚", layout="wide")
+st.markdown(f"<style>{(FRONTEND_ROOT / 'assets/dashboard.css').read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
+st.markdown('<div class="care-brand">온기케어 <span>가족을 연결하는 돌봄 대시보드</span></div>', unsafe_allow_html=True)
 
 try:
     accounts = load_accounts()
@@ -38,6 +40,12 @@ if account is None:
     else:
         render_login(accounts)
     st.stop()
+
+st.markdown('''<section class="care-hero"><div><div class="care-tag">FAMILY CARE · 보호자 전용</div>
+<h2>떨어져 있어도,<br>어르신의 하루를 함께 살펴보세요.</h2>
+<p>몸 상태와 집 안 환경을 한눈에 확인하고 필요한 조치를 선택하세요.<br>
+현재 서비스는 가상 데이터와 Mock 조치로 진행하는 시연입니다.</p></div>
+<div class="care-orbit" aria-hidden="true">♡</div></section>''', unsafe_allow_html=True)
 
 header, logout_column = st.columns([3, 1])   # 좁은 창에서도 "로그아웃" 글자가 잘리지 않게
 with header:
@@ -58,7 +66,9 @@ render_care_workflow(backend_url, profile_id=account.profile_id)
 run_response = st.session_state.get("run_response")
 with status_area:
     render_progress(run_response, st.session_state.get("approval_result"))
-    render_status_cards(run_response)
+    st.markdown('<div class="care-section">오늘의 돌봄 상태</div>', unsafe_allow_html=True)
+    render_status_cards(run_response, backend_url)
 
 st.divider()
 render_autohealing_logs(backend_url, run_response.get("run_id") if isinstance(run_response, dict) else None)
+st.markdown('<div class="care-footnote">시연용 가상 인물·측정값을 사용합니다. 기기 제어와 119 호출은 실제 실행이 아닌 Mock입니다.</div>', unsafe_allow_html=True)
