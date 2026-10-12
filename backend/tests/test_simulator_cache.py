@@ -1,5 +1,6 @@
 """Sender payload -> ingestion API -> real SQLite -> Vital fault cache recovery."""
 import asyncio
+from datetime import datetime
 import json
 from pathlib import Path
 import subprocess
@@ -36,7 +37,7 @@ def test_heat_sender_ingestion_primes_cache_and_fault_uses_it(tmp_path, monkeypa
         normal = await run_vital(db=db, run_id='warm', profile_id='profile-02', scenario='heat')
         assert normal['error'] is None
         cached = db.load_cache(cache_key('vital', 'profile-02', 'heat'), 300)
-        assert cached['data']['measured_at'] == payload['measured_at']
+        assert datetime.fromisoformat(cached['data']['measured_at']) == datetime.fromisoformat(payload['measured_at'])
         broken = await run_vital(db=db, run_id='fault', profile_id='profile-02', scenario='heat', fault=['vital'])
         assert broken['source'] == 'cache' and broken['error'] is None
         assert broken['vital'] == normal['vital']
