@@ -327,8 +327,13 @@ render_care_workflow("http://backend.test")
     assert any(item.value == "이상 없음" for item in app.success)
 
 
-def test_streamlit_app_mounts_actual_care_workflow() -> None:
+def test_streamlit_app_mounts_actual_care_workflow(monkeypatch: pytest.MonkeyPatch) -> None:
+    # 기화 10/12: 데모 계정으로 로그인한 뒤에 돌봄 워크플로가 보인다 (src/auth.py)
+    monkeypatch.setenv("DEMO_ACCOUNTS", "childA:pw-a:profile-01")
     app = AppTest.from_file("../src/app.py").run()
+    app.text_input[0].input("childA")
+    app.text_input[1].input("pw-a")
+    app = next(button for button in app.button if button.label == "로그인").click().run()
 
     assert not app.exception
     assert any(button.label == "상태 확인하기" for button in app.button)

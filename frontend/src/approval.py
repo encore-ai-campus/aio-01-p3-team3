@@ -31,6 +31,7 @@ PROFILE_LABELS = {
     "profile-01": "어르신 A (취약도 상)",
     "profile-02": "어르신 B (취약도 중)",
     "profile-03": "어르신 C (취약도 하)",
+    "profile-04": "어르신 D (취약도 상)",
 }
 SCENARIO_LABELS = {
     "normal": "정상",
@@ -235,16 +236,20 @@ def _submit_decision(
     render_approval_result(result)
 
 
-def render_care_workflow(backend_url: str) -> None:
-    """실제 ``/care/run``과 ``/care/approve``를 연결한 보호자 흐름을 그린다."""
+def render_care_workflow(backend_url: str, profile_id: str | None = None) -> None:
+    """실제 ``/care/run``과 ``/care/approve``를 연결한 보호자 흐름을 그린다.
+
+    profile_id를 넘기면(로그인한 보호자의 어르신, 기화 10/12) 어르신 선택을 숨기고 그 어르신으로 고정한다.
+    """
 
     with st.sidebar:
-        st.header("상태 확인 설정")
-        profile_id = st.selectbox(
-            "어르신",
-            options=list(PROFILE_LABELS),
-            format_func=PROFILE_LABELS.__getitem__,
-        )
+        st.header("시연 설정" if profile_id else "상태 확인 설정")
+        if profile_id is None:
+            profile_id = st.selectbox(
+                "어르신",
+                options=list(PROFILE_LABELS),
+                format_func=PROFILE_LABELS.__getitem__,
+            )
         scenario = st.selectbox(
             "시연 시나리오",
             options=list(SCENARIO_LABELS),
@@ -287,7 +292,7 @@ def render_care_workflow(backend_url: str) -> None:
     if isinstance(response, dict):
         render_approval_panel(response, backend_url)
     else:
-        st.info("왼쪽에서 어르신과 시나리오를 선택한 뒤 상태를 확인해 주세요.")
+        st.info("왼쪽에서 시나리오를 선택한 뒤 상태를 확인해 주세요.")
 
 
 def render_approval_panel(

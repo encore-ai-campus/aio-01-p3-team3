@@ -60,7 +60,7 @@ def test_seed_is_idempotent_and_returns_booleans(db):
     seed_profiles(db)
     seed_profiles(db)
     with db.connect() as conn:
-        assert conn.execute('SELECT COUNT(*) FROM profiles').fetchone()[0] == 3
+        assert conn.execute('SELECT COUNT(*) FROM profiles').fetchone()[0] == 4   # 기화 10/12: profile-04 추가
     p = db.get_profile('profile-01')
     assert p['age'] == 84 and p['lives_alone'] is True
     assert db.get_profile('missing') is None
