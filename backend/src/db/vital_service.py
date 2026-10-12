@@ -20,3 +20,9 @@ class VitalService:
                                scenario: str | None = None) -> dict | None:
         result = self.repository.latest(profile_id, scenario=scenario, max_age_s=max_age_seconds)
         return result['data'] if result is not None else None
+
+    def get_recent_vital_readings(self, profile_id: str, *, max_age_seconds: float, limit: int = 20,
+                                  scenario: str | None = None) -> list[dict]:
+        """Newest-last list of {data, measured_age_s} for a live display; empty when nothing is recent."""
+        return self.repository.recent(profile_id, scenario=scenario, limit=limit, max_age_s=max_age_seconds)
+

@@ -2,6 +2,7 @@
 
 import json
 import random
+from threading import Event, Timer
 from datetime import datetime, timezone
 
 import httpx
@@ -10,6 +11,7 @@ import pytest
 from src.mock_data import MOCK_PROFILES, SCENARIOS
 from src.vital_sender import (
     JITTER_BOUNDS,
+    JITTER_WALK_STEP,
     PROFILE_SCENARIOS,
     SenderSettings,
     build_vital_payload,
@@ -215,3 +217,50 @@ def test_settings_read_per_profile_and_jitter_flags() -> None:
     assert settings.per_profile is True
     assert settings.jitter is True
     assert SenderSettings.from_env({}).per_profile is False
+
+
+def test_values_walk_smoothly_from_the_previous_reading():
+    rng = random.Random(3)
+    settings = SenderSettings(ingest_url="http://backend.test/vitals/readings", per_profile=True, jitter=True)
+    sent: dict[str, list[dict]] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        sent.setdefault(payload["profile_id"], []).append(payload)
+        return httpx.Response(201, json={"status": "stored"})
+
+    previous: dict[str, dict[str, float]] = {}
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        for _ in range(200):
+            send_vital_cycle(client, settings, measured_at=FIXED_TIME, rng=rng, previous=previous)
+
+    for profile_id, readings in sent.items():
+        scenario = PROFILE_SCENARIOS[profile_id]
+        for before, after in zip(readings, readings[1:]):
+            for field, step in JITTER_WALK_STEP.items():
+                assert abs(after[field] - before[field]) <= step + 1e-9, (profile_id, field)   # 갑자기 튀지 않는다
+        for reading in readings:
+            for field, (low, high) in JITTER_BOUNDS[scenario].items():
+                assert low <= reading[field] <= high, (profile_id, field)                     # 시나리오 범위를 벗어나지 않는다
+        assert len({reading["heart_rate"] for reading in readings}) > 2                       # 실제로 계속 변한다
+
+
+def test_run_sender_keeps_walking_across_cycles() -> None:
+    heart_rates: list[int] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        if payload["profile_id"] == "profile-02":
+            heart_rates.append(payload["heart_rate"])
+        return httpx.Response(201, json={"status": "stored"})
+
+    settings = SenderSettings(
+        ingest_url="http://backend.test/vitals/readings", interval_seconds=0.01, per_profile=True, jitter=True
+    )
+    stop = Event()
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        Timer(0.3, stop.set).start()
+        run_sender(settings, stop_event=stop, client=client)
+
+    assert len(heart_rates) > 5
+    assert all(abs(b - a) <= JITTER_WALK_STEP["heart_rate"] for a, b in zip(heart_rates, heart_rates[1:]))

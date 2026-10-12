@@ -4,6 +4,7 @@ FastAPI 앱 — 기화(④), 두나(⑤)
 조치가 필요하면 pending_approval을 반환하고 /care/approve가 Action과 Summary를 실행한다.
 """
 
+import re
 from contextlib import asynccontextmanager
 from functools import lru_cache
 from pathlib import Path
@@ -18,6 +19,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Response  # noqa: E4
 
 from src import mcp_client  # noqa: E402
 from src.db.database import Database  # noqa: E402
+from src.db.device_states import DeviceStates  # noqa: E402
 from src.db.seed import seed_profiles  # noqa: E402
 from src.db.vital_service import VitalService  # noqa: E402
 from src.orchestrator.approval_flow import (  # noqa: E402
@@ -30,7 +32,13 @@ from src.schemas import (  # noqa: E402
     CareApprovalResponse,
     CareRunRequest,
     CareRunResponse,
+    DeviceControlRequest,
+    DeviceControlResponse,
+    DeviceStatesResponse,
     RunLogsResponse,
+    Scenario,
+    VitalLatestResponse,
+    VitalPoint,
     VitalReadingCreate,
     VitalReadingResponse,
 )
@@ -99,6 +107,23 @@ async def cctv_image(name: str) -> Response:
     return Response(content=content, media_type=media_type)
 
 
+VIDEO_NAME = re.compile(r"[A-Za-z0-9_-]+\.mp4")
+
+
+@app.get("/video/{name}")
+async def cctv_video(name: str) -> Response:
+    """CCTV 영상을 MCP 서버에서 받아 전달한다. name은 CCTV 이미지 이름에서 확장자만 .mp4로 바꾼 것 (예: fall.mp4)."""
+    if not VIDEO_NAME.fullmatch(name):
+        raise HTTPException(status_code=404, detail="CCTV 영상을 찾을 수 없습니다.")
+    try:
+        content, media_type = await mcp_client.fetch_cctv_video(name)
+    except mcp_client.CctvVideoNotFound as error:
+        raise HTTPException(status_code=404, detail="CCTV 영상을 찾을 수 없습니다.") from error
+    except mcp_client.McpConnectionError as error:
+        raise HTTPException(status_code=503, detail="CCTV 영상을 가져올 수 없습니다 (MCP 연결 실패).") from error
+    return Response(content=content, media_type=media_type)
+
+
 @app.post("/vitals/readings", response_model=VitalReadingResponse)
 def create_vital_reading(
     request: VitalReadingCreate,
@@ -122,10 +147,79 @@ def create_vital_reading(
     )
 
 
+@app.get("/vitals/latest", response_model=VitalLatestResponse)
+def latest_vital(
+    profile_id: str = Query(min_length=1),
+    scenario: Scenario | None = Query(default=None),
+    limit: int = Query(default=20, ge=1, le=100),
+    max_age_seconds: float = Query(default=120, gt=0, le=3600),
+    db: Database = Depends(get_db),
+) -> VitalLatestResponse:
+    """화면의 실시간 심박수용: 가장 최근 측정값과 최근 이력. 값이 없으면 no_data (오류 아님)."""
+    readings = VitalService(db).get_recent_vital_readings(
+        profile_id, scenario=scenario, limit=limit, max_age_seconds=max_age_seconds
+    )
+    if not readings:
+        return VitalLatestResponse(status="no_data", profile_id=profile_id, scenario=scenario)
+    newest = readings[-1]
+    data = newest["data"]
+    return VitalLatestResponse(
+        status="ok",
+        profile_id=profile_id,
+        scenario=scenario,
+        heart_rate=data["heart_rate"],
+        systolic_bp=data.get("systolic_bp"),
+        temperature_c=data.get("temperature_c"),
+        spo2=data.get("spo2"),
+        measured_at=data["measured_at"],
+        age_seconds=round(newest["measured_age_s"], 1),
+        history=[VitalPoint(measured_at=r["data"]["measured_at"], heart_rate=r["data"]["heart_rate"]) for r in readings],
+    )
+
+
 @app.post("/care/run", response_model=CareRunResponse)
 async def care_run(request: CareRunRequest, db: Database = Depends(get_db)) -> CareRunResponse:
     """모니터링 → 위험 판정 → 조치안 생성. 조치가 필요하면 pending_approval (README 6장 응답 1)."""
+    DeviceStates(db).clear(request.profile_id)   # 새로 확인하면 토글로 바꾼 기기 상태는 시나리오 기본값으로 돌아간다
     return await run_care(request, db=db)
+
+
+# 화면 토글(켜짐/꺼짐) → MCP control_device(device, action). 에어컨 켜기는 냉방으로 보낸다.
+DEVICE_ACTIONS = {
+    ("aircon", "on"): "cool",
+    ("aircon", "off"): "off",
+    ("induction", "on"): "on",
+    ("induction", "off"): "off",
+}
+
+
+@app.get("/devices/{profile_id}", response_model=DeviceStatesResponse)
+def get_device_states(profile_id: str, db: Database = Depends(get_db)) -> DeviceStatesResponse:
+    """토글로 바꾼 기기 상태 (바꾼 적 없는 기기는 없다)."""
+    if db.get_profile(profile_id) is None:
+        raise HTTPException(status_code=404, detail="어르신 프로필을 찾을 수 없습니다.")
+    return DeviceStatesResponse(profile_id=profile_id, devices=DeviceStates(db).all(profile_id))
+
+
+@app.post("/devices/control", response_model=DeviceControlResponse)
+async def control_device_state(request: DeviceControlRequest, db: Database = Depends(get_db)) -> DeviceControlResponse:
+    """에어컨·인덕션을 켜거나 끈다. MCP Mock 제어가 성공하면 그 상태를 저장한다."""
+    if db.get_profile(request.profile_id) is None:
+        raise HTTPException(status_code=404, detail="어르신 프로필을 찾을 수 없습니다.")
+    action = DEVICE_ACTIONS[(request.device, request.state)]
+    try:
+        result = await mcp_client.call_tool("control_device", {"device": request.device, "action": action})
+    except mcp_client.McpConnectionError as error:
+        raise HTTPException(status_code=503, detail="기기를 제어할 수 없습니다 (MCP 연결 실패).") from error
+    except mcp_client.McpToolError as error:
+        raise HTTPException(status_code=502, detail="기기 제어에 실패했습니다.") from error
+    DeviceStates(db).set(request.profile_id, request.device, request.state)
+    return DeviceControlResponse(
+        profile_id=request.profile_id,
+        device=request.device,
+        state=request.state,
+        message=str(result.get("message") or ""),
+    )
 
 
 @app.post("/care/approve", response_model=CareApprovalResponse)

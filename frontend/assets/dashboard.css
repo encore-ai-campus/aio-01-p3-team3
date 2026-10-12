@@ -176,8 +176,17 @@
   .stFormSubmitButton button[kind="primary"] { background: var(--ok-green); border-color: var(--ok-green); color: #fff; font-weight: 700; }
   [data-testid="stAlert"] [data-testid="stMarkdownContainer"] p, [data-testid="stAlert"] [data-testid="stMarkdownContainer"] li { font-weight: 600; }
 /* ---------- CCTV 화면 틀 (시안의 어두운 카메라 화면) ---------- */
-.st-key-cctv_frame { background: #23313a; border-radius: 18px; padding: 14px 16px 12px; color: #fff; }
-.st-key-cctv_frame p, .st-key-cctv_frame [data-testid="stCaptionContainer"] { color: #d9e1e5 !important; font-size: .86rem; }
+.st-key-cctv_frame, .st-key-cctv_video_frame { background: #23313a; border-radius: 18px; padding: 14px 16px 12px; color: #fff; margin-bottom: 14px; }
+.st-key-cctv_frame p, .st-key-cctv_frame [data-testid="stCaptionContainer"],
+.st-key-cctv_video_frame p, .st-key-cctv_video_frame [data-testid="stCaptionContainer"] { color: #d9e1e5 !important; font-size: .86rem; }
 .st-key-cctv_frame img { border-radius: 10px; }
+.st-key-cctv_video_frame video { width: 100%; border-radius: 10px; }
 .ok-cctv-head { display: flex; justify-content: space-between; font-weight: 800; font-size: .85rem; color: #fff; }
 .ok-cctv-head i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok-red); margin-right: 8px; vertical-align: middle; }
+
+/* ---------- CCTV 영상 자리 (영상 파일이 없을 때) ---------- */
+.care-video-empty {
+  aspect-ratio: 16 / 9; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  background: #121c22; border: 1px dashed #4b5b64; border-radius: 10px; color: #aab8bf; font-size: .85rem; margin-top: 8px;
+}
+.care-video-empty span { font-size: 1.6rem; color: #6f828c; }

@@ -2,7 +2,7 @@
 
 /care/run 응답의 care_status(vital, indoor_environment, devices, source)를 보여 준다.
 위험 판정은 백엔드 규칙(risk.py)이 하므로 화면은 값만 보여 주고 판단하지 않는다.
-CCTV 캡처는 주거 환경 카드 왼쪽에 보인다 (두나 님 #43에서 승인 화면 → 상태 카드로 옮김).
+CCTV 캡처·영상은 첫 화면 오른쪽(위험 판정 카드 옆)에 위아래로 보인다 (render_cctv_panel).
 [팀 합의] 10/12 해든: 수언 님 시안(index-2.html) 모양으로 타일·기기 줄을 바꿈. 값 계산 함수는 그대로.
 """
 
@@ -11,10 +11,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import datetime
 from html import escape
+from pathlib import PurePath
 
 import streamlit as st
 
-from src.api_client import BackendAPIError, fetch_cctv_image
+from src.api_client import BackendAPIError, control_device, fetch_cctv_image, fetch_cctv_video, fetch_device_states
+from src.components.live_vitals import render_live_vital_card
 from src.components.theme import COLORS, card_header
 
 SOURCE_LABELS = {
@@ -109,14 +111,36 @@ def render_vital_card(care_status: Mapping) -> None:
 
 CCTV_STATUS = {"analyzed": "분석 완료", "unavailable": "판단 불가", "failed": "분석 실패"}
 
+# CCTV 영상은 CCTV 캡처와 같은 길로 받는다: MCP assets/video/<이미지 이름>.mp4 → 백엔드 /video → 여기.
+# 이름은 상태 확인 결과의 image_path에서 얻고(normal.png → normal.mp4), 상태 확인 전에는 시나리오별 기본 장면으로 정한다.
+SCENARIO_CCTV_STEM = {"normal": "normal", "heat": "normal", "induction": "kitchen_empty", "fall": "fall", "critical": "lying"}
 
-def render_cctv(care_status: Mapping, backend_url: str | None) -> None:
-    """CCTV 캡처와 한 줄 설명 (두나 님 #43 코드를 시안의 어두운 화면 틀로 옮김)."""
-    cctv = care_status.get("cctv") or {}
+
+def cctv_video_name(care_status: Mapping | None, scenario: str | None) -> str | None:
+    image_path = ((care_status or {}).get("cctv") or {}).get("image_path")
+    stem = PurePath(str(image_path).replace("\\", "/")).stem if image_path else SCENARIO_CCTV_STEM.get(scenario or "")
+    return f"{stem}.mp4" if stem else None
+
+
+@st.cache_data(show_spinner=False, ttl=3600, max_entries=8)
+def _load_video(backend_url: str, name: str) -> bytes:
+    return fetch_cctv_video(backend_url, name)   # 실패하면 예외가 나서 캐시되지 않는다 (영상을 나중에 넣어도 바로 보인다)
+
+
+def _cctv_head(title: str, status: str) -> None:
+    st.markdown(f'<div class="ok-cctv-head"><span><i></i>{escape(title)}</span><span>{escape(status)}</span></div>',
+                unsafe_allow_html=True)
+
+
+def render_cctv(care_status: Mapping | None, backend_url: str | None) -> None:
+    """오른쪽 위: CCTV 캡처와 한 줄 설명 (두나 님 #43 코드를 시안의 어두운 화면 틀로 옮김). 결과가 없으면 자리만."""
+    cctv = (care_status or {}).get("cctv") or {}
     status = CCTV_STATUS.get(str(cctv.get("status")), "확인 전")
     with st.container(key="cctv_frame"):
-        st.markdown(f'<div class="ok-cctv-head"><span><i></i>CCTV · 거실</span><span>{escape(status)}</span></div>',
-                    unsafe_allow_html=True)
+        _cctv_head("CCTV · 거실", status)
+        if care_status is None:
+            st.markdown('<div class="care-video-empty">상태 확인 후 캡처가 표시됩니다</div>', unsafe_allow_html=True)
+            return
         path = cctv.get("image_path")
         if backend_url and path:
             try:
@@ -128,12 +152,79 @@ def render_cctv(care_status: Mapping, backend_url: str | None) -> None:
         st.write(cctv.get("description") or cctv.get("summary") or "영상 판단 불가")
 
 
-def render_home_card(care_status: Mapping, backend_url: str | None = None) -> None:
+def render_cctv_video(care_status: Mapping | None, backend_url: str | None, scenario: str | None) -> None:
+    """오른쪽 아래: CCTV 영상. 받아 오면 재생하고, 없으면 자리만 보여 준다."""
+    name = cctv_video_name(care_status, scenario)
+    video = None
+    if backend_url and name:
+        try:
+            video = _load_video(backend_url, name)
+        except (BackendAPIError, ValueError):
+            video = None
+    with st.container(key="cctv_video_frame"):
+        _cctv_head("CCTV 영상 · 거실", "재생 가능" if video else "영상 준비 중")
+        if video:
+            st.video(video, format="video/mp4")
+        else:
+            st.markdown('<div class="care-video-empty"><span>▶</span>영상 준비 중</div>', unsafe_allow_html=True)
+
+
+def render_cctv_panel(run_response: Mapping | None, backend_url: str | None = None, scenario: str | None = None) -> None:
+    """첫 화면 오른쪽 열: 위 CCTV 캡처, 아래 CCTV 영상."""
+    care_status = run_response.get("care_status") if isinstance(run_response, Mapping) else None
+    care_status = care_status if isinstance(care_status, Mapping) else None
+    render_cctv(care_status, backend_url)
+    render_cctv_video(care_status, backend_url, scenario)
+
+
+DEVICE_TOGGLES = (("aircon", "에어컨", "❄"), ("induction", "인덕션", "♨"))
+DEVICE_NOTICE_KEY = "device_notice"
+
+
+def _on_device_toggle(backend_url: str, profile_id: str, device: str, widget_key: str, label: str) -> None:
+    """토글을 누르면 백엔드로 제어를 보낸다. 실패하면 화면은 저장된 값으로 돌아가고 이유를 알려 준다."""
+    wanted = "on" if st.session_state.get(widget_key) else "off"
+    try:
+        control_device(backend_url, profile_id, device, wanted)
+    except (BackendAPIError, ValueError) as exc:
+        st.session_state[DEVICE_NOTICE_KEY] = ("error", f"{label} 제어에 실패했습니다: {exc}")
+    else:
+        st.session_state[DEVICE_NOTICE_KEY] = ("ok", f"{label}을 {'켰' if wanted == 'on' else '껐'}습니다. (Mock 제어)")
+
+
+def render_device_toggles(devices: Mapping, backend_url: str, profile_id: str) -> None:
+    """에어컨·인덕션 켜짐/꺼짐 토글. 표시는 항상 저장된 값(토글로 바꾼 값, 없으면 시나리오 기본값)을 따른다."""
+    try:
+        saved = fetch_device_states(backend_url, profile_id)
+    except (BackendAPIError, ValueError):
+        saved = {}
+    baseline = {"aircon": devices.get("air_conditioner") == "on", "induction": devices.get("induction") == "on"}
+
+    for device, label, icon in DEVICE_TOGGLES:
+        is_on = (saved[device] == "on") if device in saved else baseline[device]
+        widget_key = f"device_toggle_{profile_id}_{device}"
+        st.session_state[widget_key] = is_on          # 위젯 값을 저장된 값에 맞춘다 (눌렀지만 실패한 경우 되돌림)
+        st.toggle(
+            f"{icon} {label}",
+            key=widget_key,
+            on_change=_on_device_toggle,
+            args=(backend_url, profile_id, device, widget_key, label),
+        )
+        if device == "induction" and is_on and device not in saved:
+            detail = induction_text(devices)             # 시나리오가 알려 준 가동 시간·온도
+        else:
+            detail = "켜짐" if is_on else "꺼짐"
+        st.caption(detail)
+
+    notice = st.session_state.pop(DEVICE_NOTICE_KEY, None)
+    if notice:
+        (st.success if notice[0] == "ok" else st.warning)(notice[1])
+
+
+def render_home_card(care_status: Mapping, backend_url: str | None = None, profile_id: str | None = None) -> None:
     with st.container(key="home_card"):
-        card_header("주거 환경과 CCTV", "IoT Agent · 영상은 위급 판단에만 쓰고 기기 제어는 보호자 승인 후 실행")
-        cctv_column, env_column = st.columns([1.25, 1], gap="medium")
-        with cctv_column:
-            render_cctv(care_status, backend_url)
+        card_header("주거 환경", "IoT Agent · 기기 제어는 보호자 승인 후 실행 (CCTV는 오른쪽 위)")
+        env_column, device_column = st.columns(2, gap="medium")
         with env_column:
             env = care_status.get("indoor_environment")
             if env:
@@ -145,8 +236,11 @@ def render_home_card(care_status: Mapping, backend_url: str | None = None) -> No
             else:
                 st.warning("실내 온습도를 확인할 수 없습니다.")
 
+        with device_column:
             devices = care_status.get("devices")
-            if devices:
+            if devices and backend_url and profile_id:
+                render_device_toggles(devices, backend_url, profile_id)
+            elif devices:
                 aircon = str(devices.get("air_conditioner"))
                 st.markdown(
                     _device_row("에어컨", DEVICE_STATE.get(aircon, "알 수 없음"), aircon == "on")
@@ -157,11 +251,27 @@ def render_home_card(care_status: Mapping, backend_url: str | None = None) -> No
                 st.warning("기기 상태를 확인할 수 없습니다.")
 
 
-def render_status_cards(run_response: Mapping | None, backend_url: str | None = None) -> None:
+def render_status_cards(
+    run_response: Mapping | None,
+    backend_url: str | None = None,
+    *,
+    profile_id: str | None = None,
+    scenario: str | None = None,
+) -> None:
+    """바이탈 카드와 주거 환경 카드를 그린다 (CCTV는 오른쪽 위 render_cctv_panel).
+
+    profile_id·scenario를 주면 바이탈 카드가 3초마다 갱신되는 실시간 값이 된다 (상태 확인 전에도 보인다).
+    """
     care_status = run_response.get("care_status") if isinstance(run_response, Mapping) else None
+    live = bool(backend_url and profile_id and scenario)
     if not isinstance(care_status, Mapping):
+        if live:
+            render_live_vital_card(backend_url, profile_id, scenario, None)
         st.markdown('<div class="care-empty">아직 측정 결과가 없습니다. 왼쪽에서 \'상태 확인하기\'를 눌러 주세요.</div>',
                     unsafe_allow_html=True)
         return
-    render_vital_card(care_status)
-    render_home_card(care_status, backend_url)
+    if live:
+        render_live_vital_card(backend_url, profile_id, scenario, care_status)
+    else:
+        render_vital_card(care_status)
+    render_home_card(care_status, backend_url, profile_id if live else None)

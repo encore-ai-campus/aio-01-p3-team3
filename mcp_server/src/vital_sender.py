@@ -36,6 +36,8 @@ PROFILE_SCENARIOS: dict[str, Scenario] = {
 
 # 실시간처럼 보이게 값을 흔들 때의 최대 변동폭.
 JITTER_STEP = {"heart_rate": 3, "systolic_bp": 3, "temperature_c": 0.1, "spo2": 1}
+# 직전 값에서 한 번에 움직이는 최대 폭. 자주 보낼 때 값이 튀지 않고 사람의 맥박처럼 서서히 오르내린다.
+JITTER_WALK_STEP = {"heart_rate": 2, "systolic_bp": 1, "temperature_c": 0.1, "spo2": 1}
 # 변동해도 위험도 판정(backend/src/rules/risk.py 점수표)이 시나리오 기대 결과에서 벗어나지 않는 범위.
 # 값이 점수 경계에 걸리는 곳(critical 체온 36.0, 산소포화도 96 등)은 한쪽으로만 흔든다.
 JITTER_BOUNDS: dict[str, dict[str, tuple[float, float]]] = {
@@ -62,12 +64,22 @@ def _flag(value: str | None) -> bool:
     return (value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
-def jitter_vital(vital: dict[str, object], scenario: str, rng: random.Random) -> None:
-    """측정값을 시나리오 범위(JITTER_BOUNDS) 안에서 조금 흔든다. vital을 직접 바꾼다."""
+def jitter_vital(
+    vital: dict[str, object],
+    scenario: str,
+    rng: random.Random,
+    previous: dict[str, float] | None = None,
+) -> None:
+    """측정값을 시나리오 범위(JITTER_BOUNDS) 안에서 조금 흔든다. vital을 직접 바꾼다.
+
+    previous(직전에 보낸 값)가 있으면 거기서 JITTER_WALK_STEP만큼만 움직이고, 없으면 시나리오 기본값에서 시작한다.
+    """
     for field, step in JITTER_STEP.items():
         base = vital.get(field)
         if base is None:
             continue
+        if previous and previous.get(field) is not None:
+            base, step = previous[field], JITTER_WALK_STEP[field]
         low, high = JITTER_BOUNDS[scenario][field]
         value = min(max(float(base) + rng.uniform(-step, step), low), high)
         vital[field] = round(value, 1) if field == "temperature_c" else round(value)
@@ -124,8 +136,9 @@ def build_vital_payload(
     *,
     measured_at: datetime | None = None,
     rng: random.Random | None = None,
+    previous: dict[str, float] | None = None,
 ) -> dict[str, object]:
-    """기존 Mock 바이탈을 수집 API 요청 형식으로 변환한다. rng를 주면 값을 범위 안에서 흔든다."""
+    """기존 Mock 바이탈을 수집 API 요청 형식으로 변환한다. rng를 주면 값을 범위 안에서 흔들고, previous를 주면 직전 값에서 이어서 움직인다."""
 
     if profile_id not in MOCK_PROFILES:
         raise ValueError(f"지원하지 않는 profile_id입니다: {profile_id}")
@@ -141,7 +154,7 @@ def build_vital_payload(
         timestamp = timestamp.astimezone()
 
     if rng is not None:
-        jitter_vital(vital, scenario, rng)
+        jitter_vital(vital, scenario, rng, previous)
 
     vital["scenario"] = scenario
     vital["profile_id"] = profile_id
@@ -169,13 +182,19 @@ def send_vital_cycle(
     settings: SenderSettings,
     *,
     measured_at: datetime | None = None,
+    rng: random.Random | None = None,
+    previous: dict[str, dict[str, float]] | None = None,
 ) -> dict[str, str]:
-    """최신 계약의 세 프로필을 한 번씩 전송하고 결과를 반환한다."""
+    """어르신 프로필을 한 번씩 전송하고 결과를 반환한다.
+
+    previous는 어르신별로 직전에 보낸 값을 담는 상자다. 같은 상자를 계속 넘기면 값이 직전 값에서 이어서 움직인다.
+    """
 
     results: dict[str, str] = {}
     cycle_time = measured_at or datetime.now().astimezone()
 
-    rng = random.Random() if settings.jitter else None
+    if rng is None and settings.jitter:
+        rng = random.Random()
     for profile_id in MOCK_PROFILES:
         scenario = PROFILE_SCENARIOS.get(profile_id, settings.scenario) if settings.per_profile else settings.scenario
         payload = build_vital_payload(
@@ -183,7 +202,10 @@ def send_vital_cycle(
             scenario,
             measured_at=cycle_time,
             rng=rng,
+            previous=previous.get(profile_id) if previous is not None else None,
         )
+        if previous is not None and rng is not None:
+            previous[profile_id] = {field: payload[field] for field in JITTER_STEP if payload.get(field) is not None}
         try:
             response = post_vital_reading(client, settings.ingest_url, payload)
         except (httpx.HTTPError, ValueError) as exc:
@@ -215,9 +237,11 @@ def run_sender(
     owns_client = client is None
     active_client = client or httpx.Client(timeout=settings.timeout_seconds)
 
+    rng = random.Random() if settings.jitter else None
+    previous: dict[str, dict[str, float]] = {}   # 어르신별 직전 값. 값이 서서히 이어서 움직이게 한다
     try:
         while True:
-            send_vital_cycle(active_client, settings)
+            send_vital_cycle(active_client, settings, rng=rng, previous=previous)
             if once:
                 return
 

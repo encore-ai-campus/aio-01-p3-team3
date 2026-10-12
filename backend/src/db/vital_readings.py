@@ -129,3 +129,25 @@ class VitalReadings:
                 'scenario': row['scenario'], 'origin': 'simulator',
                 'data': {**{f: row[f] for f in VITAL_FIELDS}, 'measured_at': row['measured_at']},
                 'received_at': row['received_at'], 'measured_age_s': age}
+
+    def recent(self, profile_id, *, max_age_s, limit, scenario=None):
+        """Newest ``limit`` readings of one profile/scenario stream within max_age_s, oldest first.
+
+        Display helper (live chart); same stream and age rules as latest(). Database errors propagate.
+        """
+        _identifier(profile_id)
+        if scenario is not None:
+            _identifier(scenario)
+        if not math.isfinite(max_age_s) or max_age_s < 0:
+            raise ValueError('max_age_s must be finite and nonnegative')
+        if type(limit) is not int or limit < 1:
+            raise ValueError('limit must be a positive integer')
+        with self.db.connect() as conn:
+            rows = conn.execute('''SELECT * FROM vital_readings
+                WHERE profile_id=? AND scenario IS ?
+                ORDER BY measured_at_epoch DESC, id DESC LIMIT ?''', (profile_id, scenario, limit)).fetchall()
+        now = self.db.clock()
+        readings = [{'data': {**{f: row[f] for f in VITAL_FIELDS}, 'measured_at': row['measured_at']},
+                     'measured_age_s': now - row['measured_at_epoch']} for row in rows]
+        return [r for r in reversed(readings) if 0 <= r['measured_age_s'] <= max_age_s]
+

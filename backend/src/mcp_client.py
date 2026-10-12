@@ -18,6 +18,7 @@ MCP_URL = os.getenv("MCP_URL", "http://127.0.0.1:8010/mcp")
 # CCTV 이미지는 MCP 도구가 아니라 MCP 서버의 일반 HTTP 경로(/cctv/{name})로 받는다
 MCP_BASE_URL = MCP_URL.rstrip("/").removesuffix("/mcp")
 CCTV_TIMEOUT_SECONDS = 10.0
+VIDEO_TIMEOUT_SECONDS = 60.0   # 영상은 이미지보다 커서 넉넉히
 
 
 class McpConnectionError(ConnectionError):
@@ -30,6 +31,10 @@ class McpToolError(RuntimeError):
     def __init__(self, tool: str, message: str):
         super().__init__(f"{tool}: {message}")
         self.tool = tool
+
+
+class CctvVideoNotFound(LookupError):
+    """MCP 서버에 해당 CCTV 영상이 없음 (허용 목록에 없거나 아직 파일을 넣지 않음)."""
 
 
 class CctvImageNotFound(LookupError):
@@ -91,3 +96,19 @@ async def list_tools(*, url: str | None = None) -> list[str]:
     except Exception as error:
         raise McpConnectionError(f"MCP 연결 실패: {type(error).__name__}") from error
     return [tool.name for tool in tools]
+
+
+async def fetch_cctv_video(name: str, *, base_url: str | None = None) -> tuple[bytes, str]:
+    """MCP 서버의 CCTV 영상을 받는다. → (영상 바이트, content-type)"""
+    url = f"{(base_url or MCP_BASE_URL).rstrip('/')}/video/{name}"
+    try:
+        async with httpx.AsyncClient(timeout=VIDEO_TIMEOUT_SECONDS) as client:
+            response = await client.get(url)
+    except httpx.HTTPError as error:
+        raise McpConnectionError(f"MCP 연결 실패 (video): {type(error).__name__}") from error
+    if response.status_code == 404:
+        raise CctvVideoNotFound(name)
+    if response.status_code != 200:
+        raise McpConnectionError(f"MCP CCTV 영상 응답 오류: HTTP {response.status_code}")
+    return response.content, response.headers.get("content-type", "video/mp4")
+

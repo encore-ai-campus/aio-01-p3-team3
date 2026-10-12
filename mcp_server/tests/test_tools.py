@@ -252,9 +252,14 @@ def test_control_device_rejects_unknown_aircon_action() -> None:
         control_device("aircon", action="on")  # type: ignore[arg-type]
 
 
-def test_control_device_rejects_turning_on_induction() -> None:
-    with pytest.raises(ValueError, match="action은 off만 지원"):
-        control_device("induction", action="on")  # type: ignore[arg-type]
+def test_control_device_turns_induction_on_and_off_as_mock() -> None:
+    assert control_device("induction", action="on")["message"] == "인덕션 켜기를 Mock으로 실행했습니다."
+    assert control_device("induction", action="off")["message"] == "인덕션 끄기를 Mock으로 실행했습니다."
+
+
+def test_control_device_rejects_cooling_an_induction() -> None:
+    with pytest.raises(ValueError, match="인덕션 action은 on, off"):
+        control_device("induction", action="cool")  # type: ignore[arg-type]
 
 
 def test_control_device_does_not_change_scenario_data() -> None:

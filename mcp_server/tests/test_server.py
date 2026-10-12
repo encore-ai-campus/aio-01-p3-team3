@@ -94,3 +94,39 @@ def test_cctv_route_serves_allowed_file(monkeypatch) -> None:
 
     assert isinstance(response, FileResponse)
     assert Path(response.path) == asset_dir / "test_placeholder.py"
+
+
+def test_video_names_follow_image_names() -> None:
+    assert server.CCTV_VIDEO_NAMES == {Path(name).with_suffix(".mp4").name for name in server.CCTV_IMAGE_NAMES}
+    assert server.CCTV_VIDEO_DIR == Path(__file__).resolve().parents[1] / "assets" / "video"
+
+
+def test_video_route_rejects_unknown_name() -> None:
+    for name in ("unknown.mp4", "../server.py", "normal.png"):
+        response = asyncio.run(server.get_cctv_video(SimpleNamespace(path_params={"name": name})))
+
+        assert response.status_code == 404, name
+        assert json.loads(response.body)["error"] == "CCTV_VIDEO_NOT_FOUND"
+
+
+def test_video_route_serves_an_existing_video_as_mp4(monkeypatch, tmp_path) -> None:
+    name = sorted(server.CCTV_VIDEO_NAMES)[0]
+    (tmp_path / name).write_bytes(b"\x00\x00\x00\x18ftypmp42")
+    monkeypatch.setattr(server, "CCTV_VIDEO_DIR", tmp_path)
+
+    response = asyncio.run(server.get_cctv_video(SimpleNamespace(path_params={"name": name})))
+
+    assert isinstance(response, FileResponse)
+    assert Path(response.path) == tmp_path / name
+    assert response.media_type == "video/mp4"
+
+
+def test_video_route_reports_allowed_but_missing_video(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(server, "CCTV_VIDEO_DIR", tmp_path)
+    name = sorted(server.CCTV_VIDEO_NAMES)[0]
+
+    response = asyncio.run(server.get_cctv_video(SimpleNamespace(path_params={"name": name})))
+
+    assert response.status_code == 404
+    assert json.loads(response.body)["error"] == "CCTV_VIDEO_NOT_READY"
+

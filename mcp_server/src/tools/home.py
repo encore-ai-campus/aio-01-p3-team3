@@ -7,7 +7,7 @@ from ..mock_data import MOCK_PROFILES, SCENARIOS, Scenario
 
 
 ControllableDevice: TypeAlias = Literal["aircon", "induction"]
-DeviceAction: TypeAlias = Literal["cool", "heat", "off"]
+DeviceAction: TypeAlias = Literal["cool", "heat", "on", "off"]
 
 DEVICE_LABELS: dict[ControllableDevice, str] = {
     "aircon": "에어컨",
@@ -72,9 +72,9 @@ def control_device(
         action_label = {"cool": "냉방을", "heat": "난방을", "off": "끄기를"}[action]
         message = f"에어컨 {action_label} Mock으로 실행했습니다."
     else:
-        if action != "off":
-            raise ValueError("인덕션 action은 off만 지원합니다.")
-        message = "인덕션 끄기를 Mock으로 실행했습니다."
+        if action not in {"on", "off"}:
+            raise ValueError("인덕션 action은 on, off 중 하나여야 합니다.")
+        message = f"인덕션 {'켜기' if action == 'on' else '끄기'}를 Mock으로 실행했습니다."
 
     return {
         "tool": "control_device",

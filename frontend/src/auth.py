@@ -19,10 +19,10 @@ import streamlit as st
 
 # 프로필 ID → 화면에 보일 이름 (가상 인물). docs/scenarios.md 3장 프로필과 같다.
 PROFILE_DISPLAY = {
-    "profile-01": {"guardian": "자녀 A", "elder": "어르신 A", "vulnerability": "상"},
-    "profile-02": {"guardian": "자녀 B", "elder": "어르신 B", "vulnerability": "중"},
-    "profile-03": {"guardian": "자녀 C", "elder": "어르신 C", "vulnerability": "하"},
-    "profile-04": {"guardian": "자녀 D", "elder": "어르신 D", "vulnerability": "상"},
+    "profile-01": {"guardian": "A", "elder": "어르신 A", "vulnerability": "상"},
+    "profile-02": {"guardian": "B", "elder": "어르신 B", "vulnerability": "중"},
+    "profile-03": {"guardian": "C", "elder": "어르신 C", "vulnerability": "하"},
+    "profile-04": {"guardian": "D", "elder": "어르신 D", "vulnerability": "상"},
 }
 SESSION_KEY = "guardian"
 # 로그아웃하거나 다른 보호자로 바꿀 때 지우는 화면 상태 (두나 님 approval.py가 저장하는 키 포함)

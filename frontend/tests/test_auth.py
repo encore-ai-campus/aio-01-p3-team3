@@ -13,7 +13,7 @@ def test_parse_four_demo_accounts():
     accounts = parse_accounts(RAW)
     assert set(accounts) == {"childA", "childB", "childC", "childD"}
     assert accounts["childB"].profile_id == "profile-02"
-    assert accounts["childB"].guardian_name == "자녀 B" and accounts["childB"].elder_name == "어르신 B"
+    assert accounts["childB"].guardian_name == "B" and accounts["childB"].elder_name == "어르신 B"
     assert accounts["childD"].profile_id == "profile-04" and accounts["childD"].elder_name == "어르신 D"
 
 

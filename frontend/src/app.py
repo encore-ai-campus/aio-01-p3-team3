@@ -21,9 +21,9 @@ if str(FRONTEND_ROOT) not in sys.path:
     sys.path.insert(0, str(FRONTEND_ROOT))
 load_dotenv(FRONTEND_ROOT / "config" / ".env")
 
-from src.approval import render_care_workflow  # noqa: E402
+from src.approval import PROFILE_SCENARIO, render_care_workflow  # noqa: E402
 from src.auth import current_account, load_accounts, log_out, render_login  # noqa: E402
-from src.components.cards import render_status_cards  # noqa: E402
+from src.components.cards import render_cctv_panel, render_status_cards  # noqa: E402
 from src.components.logs import render_autohealing_logs  # noqa: E402
 from src.components.progress import render_progress  # noqa: E402
 from src.components.theme import RISK_COLORS, apply_theme, brand_html  # noqa: E402
@@ -81,15 +81,18 @@ banner_area = st.container()
 progress_area = st.container()
 
 backend_url = os.getenv("BACKEND_URL", "http://127.0.0.1:8000")
-# 첫 화면 맨 위: 위험도 배너 → 보호자 조치 승인(조치안·승인 버튼) → 결과 (전체 폭)
-with st.container(key="alert_card"):
-    st.markdown('<p class="ok-card-title">위험 판정과 보호자 승인</p>'
-                '<div class="ok-card-sub">Emergency Agent · 기기 제어와 119는 승인 후 실행</div>',
-                unsafe_allow_html=True)
-    render_care_workflow(backend_url, profile_id=account.profile_id)
+MAIN_COLUMNS = [1.35, 1]   # 왼쪽(위험 판정·측정값) : 오른쪽(CCTV·로그). 위아래 두 줄의 경계를 맞춘다
+# 첫 화면 위쪽: 왼쪽은 위험 판정·보호자 승인, 오른쪽은 CCTV 캡처(위)와 CCTV 영상(아래)
+alert_column, cctv_column = st.columns(MAIN_COLUMNS, gap="medium")
+with alert_column:
+    with st.container(key="alert_card"):
+        st.markdown('<p class="ok-card-title">위험 판정과 보호자 승인</p>'
+                    '<div class="ok-card-sub">Emergency Agent · 기기 제어와 119는 승인 후 실행</div>',
+                    unsafe_allow_html=True)
+        render_care_workflow(backend_url, profile_id=account.profile_id)
 
 # 그 아래: 왼쪽 측정값 카드 / 오른쪽 AutoHealing 로그
-left_column, right_column = st.columns([1.7, 1], gap="medium")
+left_column, right_column = st.columns(MAIN_COLUMNS, gap="medium")
 
 run_response = st.session_state.get("run_response")
 run_mapping = run_response if isinstance(run_response, dict) else {}
@@ -101,8 +104,10 @@ with banner_area:
                 unsafe_allow_html=True)
 with progress_area:
     render_progress(run_response, st.session_state.get("approval_result"))
+with cctv_column:
+    render_cctv_panel(run_response, backend_url, PROFILE_SCENARIO.get(account.profile_id))
 with left_column:
-    render_status_cards(run_response, backend_url)
+    render_status_cards(run_response, backend_url, profile_id=account.profile_id, scenario=PROFILE_SCENARIO.get(account.profile_id))
 with right_column:
     with st.container(key="logs_card"):
         render_autohealing_logs(backend_url, run_mapping.get("run_id"))

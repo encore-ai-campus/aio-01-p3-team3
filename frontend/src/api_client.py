@@ -148,3 +148,112 @@ def fetch_cctv_image(
     if not response.ok:
         raise BackendAPIError(f"CCTV 이미지 조회 실패: {_error_detail(response)}")
     return response.content
+
+
+def fetch_cctv_video(
+    backend_url: str,
+    video_name: str,
+    *,
+    timeout: float | tuple[float, float] = (5.0, 60.0),   # (연결 5초, 영상 받기 60초): 서버가 안 열려 있어도 화면이 오래 멈추지 않게
+    session: HTTPSession | None = None,
+) -> bytes:
+    """백엔드를 거쳐 MCP 서버의 CCTV 영상(예: ``lying.mp4``)을 가져온다."""
+
+    name = PurePath(video_name.replace("\\", "/")).name
+    if not name:
+        raise ValueError("video_name에서 파일명을 찾을 수 없습니다.")
+
+    requester = session or requests
+    url = f"{_base_url(backend_url)}/video/{quote(name, safe='')}"
+    try:
+        response = requester.get(url, timeout=timeout)
+    except requests.RequestException as exc:
+        raise BackendAPIError(f"CCTV 영상을 가져올 수 없습니다: {exc}") from exc
+
+    if not response.ok:
+        raise BackendAPIError(f"CCTV 영상 조회 실패: {_error_detail(response)}")
+    return response.content
+
+
+def request_latest_vital(
+    backend_url: str,
+    profile_id: str,
+    scenario: str,
+    *,
+    limit: int = 20,
+    timeout: float = 5.0,
+    session: HTTPSession | None = None,
+) -> dict[str, object]:
+    """실시간 심박수 화면용 최근 바이탈(``VitalLatestResponse``)을 가져온다. 값이 없으면 status가 no_data."""
+
+    if not profile_id.strip():
+        raise ValueError("profile_id는 비어 있을 수 없습니다.")
+    if scenario not in SCENARIOS:
+        raise ValueError(f"지원하지 않는 scenario입니다: {scenario}")
+
+    requester = session or requests
+    url = f"{_base_url(backend_url)}/vitals/latest"
+    try:
+        response = requester.get(
+            url,
+            params={"profile_id": profile_id, "scenario": scenario, "limit": limit},
+            timeout=timeout,
+        )
+    except requests.RequestException as exc:
+        raise BackendAPIError(f"실시간 바이탈 API에 연결할 수 없습니다: {exc}") from exc
+
+    return _response_json(response, "실시간 바이탈 조회")
+
+
+DEVICE_NAMES = frozenset({"aircon", "induction"})
+
+
+def fetch_device_states(
+    backend_url: str,
+    profile_id: str,
+    *,
+    timeout: float = 5.0,
+    session: HTTPSession | None = None,
+) -> dict[str, str]:
+    """토글로 바꾼 기기 상태({"aircon": "on", ...}). 바꾼 적 없는 기기는 없다."""
+
+    if not profile_id.strip():
+        raise ValueError("profile_id는 비어 있을 수 없습니다.")
+    requester = session or requests
+    url = f"{_base_url(backend_url)}/devices/{quote(profile_id.strip(), safe='')}"
+    try:
+        response = requester.get(url, timeout=timeout)
+    except requests.RequestException as exc:
+        raise BackendAPIError(f"기기 상태를 가져올 수 없습니다: {exc}") from exc
+
+    devices = _response_json(response, "기기 상태 조회").get("devices")
+    return {str(name): str(state) for name, state in devices.items()} if isinstance(devices, dict) else {}
+
+
+def control_device(
+    backend_url: str,
+    profile_id: str,
+    device: str,
+    state: str,
+    *,
+    timeout: float = 15.0,
+    session: HTTPSession | None = None,
+) -> dict[str, object]:
+    """에어컨·인덕션을 켜거나(``on``) 끈다(``off``). 백엔드가 MCP Mock 제어를 실행하고 상태를 저장한다."""
+
+    if not profile_id.strip():
+        raise ValueError("profile_id는 비어 있을 수 없습니다.")
+    if device not in DEVICE_NAMES:
+        raise ValueError(f"지원하지 않는 device입니다: {device}")
+    if state not in {"on", "off"}:
+        raise ValueError(f"지원하지 않는 state입니다: {state}")
+
+    requester = session or requests
+    url = f"{_base_url(backend_url)}/devices/control"
+    try:
+        response = requester.post(url, json={"profile_id": profile_id, "device": device, "state": state}, timeout=timeout)
+    except requests.RequestException as exc:
+        raise BackendAPIError(f"기기를 제어할 수 없습니다: {exc}") from exc
+
+    return _response_json(response, "기기 제어")
+

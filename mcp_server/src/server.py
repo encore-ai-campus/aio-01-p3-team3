@@ -26,6 +26,9 @@ CCTV_IMAGE_NAMES = {
     Path(str(data["cctv_image_path"])).name
     for data in SCENARIOS.values()
 }
+CCTV_VIDEO_DIR = Path(__file__).resolve().parent.parent / "assets" / "video"
+# 영상 이름은 CCTV 이미지 이름에서 확장자만 .mp4로 바꾼 것 (normal.png → normal.mp4)
+CCTV_VIDEO_NAMES = {Path(name).with_suffix(".mp4").name for name in CCTV_IMAGE_NAMES}
 
 mcp = FastMCP(
     "elder-care-tools",
@@ -100,6 +103,27 @@ async def get_cctv_image(request):
         )
 
     return FileResponse(image_path)
+
+
+@mcp.custom_route("/video/{name}", methods=["GET"])
+async def get_cctv_video(request):
+    """허용된 CCTV 영상(이미지와 같은 이름의 .mp4)만 반환한다."""
+
+    name = request.path_params["name"]
+    if name not in CCTV_VIDEO_NAMES:
+        return JSONResponse(
+            {"error": "CCTV_VIDEO_NOT_FOUND", "name": name},
+            status_code=404,
+        )
+
+    video_path = CCTV_VIDEO_DIR / name
+    if not video_path.is_file():
+        return JSONResponse(
+            {"error": "CCTV_VIDEO_NOT_READY", "name": name},
+            status_code=404,
+        )
+
+    return FileResponse(video_path, media_type="video/mp4")
 
 
 if __name__ == "__main__":

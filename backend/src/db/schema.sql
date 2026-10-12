@@ -31,3 +31,11 @@ CREATE TABLE IF NOT EXISTS vital_readings (
 );
 CREATE INDEX IF NOT EXISTS readings_latest
     ON vital_readings(profile_id, scenario, measured_at_epoch DESC, id DESC);
+-- 보호자가 화면 토글로 바꾼 기기 상태. 새 "상태 확인하기"를 실행하면 해당 어르신 것은 지워지고 시나리오 기본값으로 돌아간다.
+CREATE TABLE IF NOT EXISTS device_states (
+    profile_id TEXT NOT NULL,
+    device TEXT NOT NULL CHECK(device IN ('aircon','induction')),
+    state TEXT NOT NULL CHECK(state IN ('on','off')),
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (profile_id, device)
+);

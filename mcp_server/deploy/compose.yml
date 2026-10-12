@@ -18,5 +18,5 @@ services:
       dockerfile: deploy/Dockerfile
     env_file:
       - ../.env.docker
-    command: ["python", "-m", "src.vital_sender", "--per-profile", "--jitter"]
+    command: ["python", "-m", "src.vital_sender", "--per-profile", "--jitter", "--interval", "3"]
     restart: unless-stopped

@@ -23,7 +23,7 @@ services:
         required: false
     environment:
       VITAL_INGEST_URL: http://backend:8000/vitals/readings
-    command: ["python", "-m", "src.vital_sender", "--per-profile", "--jitter"]
+    command: ["python", "-m", "src.vital_sender", "--per-profile", "--jitter", "--interval", "3"]
     restart: unless-stopped
     depends_on:
       - backend

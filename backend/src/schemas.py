@@ -87,6 +87,28 @@ class VitalReadingCreate(BaseModel):
     )
 
 
+class VitalPoint(BaseModel):
+    """실시간 심박수 그래프의 점 하나."""
+
+    measured_at: datetime = Field(description="측정 시각")
+    heart_rate: int = Field(description="심박수(회/분)")
+
+
+class VitalLatestResponse(BaseModel):
+    """화면용 최근 바이탈. 최근 값이 없으면 status가 no_data이고 값 필드는 비어 있다."""
+
+    status: Literal["ok", "no_data"] = Field(description="ok: 최근 측정값 있음 / no_data: 아직 수신된 값 없음")
+    profile_id: str = Field(description="어르신 ID")
+    scenario: Scenario | None = Field(default=None, description="조회한 시나리오 스트림")
+    heart_rate: int | None = Field(default=None, description="가장 최근 심박수(회/분)")
+    systolic_bp: int | None = Field(default=None, description="가장 최근 수축기 혈압")
+    temperature_c: float | None = Field(default=None, description="가장 최근 체온(°C)")
+    spo2: int | None = Field(default=None, description="가장 최근 산소포화도(%)")
+    measured_at: datetime | None = Field(default=None, description="가장 최근 측정 시각")
+    age_seconds: float | None = Field(default=None, description="마지막 측정 이후 지난 시간(초)")
+    history: list[VitalPoint] = Field(default_factory=list, description="오래된 것부터 최신 순의 심박수 이력")
+
+
 class VitalReadingResponse(BaseModel):
     """바이탈 데이터 저장 완료 응답."""
 
@@ -345,3 +367,31 @@ class CareApprovalResponse(BaseModel):
 
 # CareRunResponse.actions가 아래에 정의된 ActionResult를 쓰므로 정의가 끝난 뒤 다시 만든다 (해든 10/12)
 CareRunResponse.model_rebuild()
+
+
+DeviceName = Literal["aircon", "induction"]
+DeviceState = Literal["on", "off"]
+
+
+class DeviceControlRequest(BaseModel):
+    """화면 토글: 어르신의 에어컨·인덕션을 켜거나 끈다 (Mock 제어)."""
+
+    profile_id: str = Field(min_length=1, description="기기를 제어할 어르신 ID")
+    device: DeviceName = Field(description="제어할 기기")
+    state: DeviceState = Field(description="바꿀 상태")
+
+
+class DeviceControlResponse(BaseModel):
+    status: Literal["success"] = "success"
+    profile_id: str
+    device: DeviceName
+    state: DeviceState
+    message: str = Field(default="", description="MCP 제어 결과 문구")
+
+
+class DeviceStatesResponse(BaseModel):
+    """토글로 바꾼 기기 상태. 바꾼 적 없는 기기는 없다(시나리오 기본값을 따른다)."""
+
+    profile_id: str
+    devices: dict[str, DeviceState] = Field(default_factory=dict)
+
