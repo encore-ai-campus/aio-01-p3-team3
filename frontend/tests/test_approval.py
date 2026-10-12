@@ -177,6 +177,28 @@ render_approval_panel(
     assert any("보호자 승인 없이" in error.value for error in app.error)
 
 
+def test_timeout_result_is_not_shown_as_guardian_approval() -> None:
+    app = AppTest.from_string(
+        """
+from src.approval import render_approval_result
+
+render_approval_result(
+    {
+        "run_id": "run-006",
+        "status": "done",
+        "current_step": "승인 대기 시간 초과 → 119 호출(mock) 완료",
+        "actions": [],
+        "decided_by": "timeout",
+    }
+)
+"""
+    ).run()
+
+    assert not app.exception
+    assert any("승인 응답이 없어" in warning.value for warning in app.warning)
+    assert not any("승인된 조치" in success.value for success in app.success)
+
+
 def test_normal_and_failed_results_have_clear_feedback() -> None:
     normal_app = AppTest.from_string(
         """
