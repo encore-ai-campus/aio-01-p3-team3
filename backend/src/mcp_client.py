@@ -10,10 +10,14 @@ import json
 import os
 from contextlib import asynccontextmanager
 
+import httpx
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
 MCP_URL = os.getenv("MCP_URL", "http://127.0.0.1:8010/mcp")
+# CCTV 이미지는 MCP 도구가 아니라 MCP 서버의 일반 HTTP 경로(/cctv/{name})로 받는다
+MCP_BASE_URL = MCP_URL.rstrip("/").removesuffix("/mcp")
+CCTV_TIMEOUT_SECONDS = 10.0
 
 
 class McpConnectionError(ConnectionError):
@@ -26,6 +30,10 @@ class McpToolError(RuntimeError):
     def __init__(self, tool: str, message: str):
         super().__init__(f"{tool}: {message}")
         self.tool = tool
+
+
+class CctvImageNotFound(LookupError):
+    """MCP 서버에 해당 CCTV 이미지가 없음 (허용 목록에 없거나 파일이 없음)."""
 
 
 @asynccontextmanager
@@ -58,6 +66,21 @@ async def call_tool(name: str, arguments: dict | None = None, *, url: str | None
     if result.isError:
         raise McpToolError(name, _text(result) or "도구 호출 실패")
     return _payload(result)
+
+
+async def fetch_cctv_image(name: str, *, base_url: str | None = None) -> tuple[bytes, str]:
+    """MCP 서버의 CCTV 캡처 이미지를 받는다. → (이미지 바이트, content-type)"""
+    url = f"{(base_url or MCP_BASE_URL).rstrip('/')}/cctv/{name}"
+    try:
+        async with httpx.AsyncClient(timeout=CCTV_TIMEOUT_SECONDS) as client:
+            response = await client.get(url)
+    except httpx.HTTPError as error:
+        raise McpConnectionError(f"MCP 연결 실패 (cctv): {type(error).__name__}") from error
+    if response.status_code == 404:
+        raise CctvImageNotFound(name)
+    if response.status_code != 200:
+        raise McpConnectionError(f"MCP CCTV 응답 오류: HTTP {response.status_code}")
+    return response.content, response.headers.get("content-type", "application/octet-stream")
 
 
 async def list_tools(*, url: str | None = None) -> list[str]:
